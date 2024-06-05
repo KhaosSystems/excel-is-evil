@@ -107,10 +107,11 @@
   // Initialize an empty object to store the sums for each month
   let monthlySums = {}
 
-  const makeRow = (
+  const MakeRow = (
     type: EntryType = EntryType.Expense,
     description: string = 'description',
     amount: number = 0,
+    category: string = 'miscellaneous',
     interval: EntryInterval = EntryInterval.Monthly,
   ) => {
     return {
@@ -118,11 +119,68 @@
       description: description,
       amount: amount,
       interval: interval,
+      category: category,
       timeRange: { start: startOfYear(today(getLocalTimeZone())), end: endOfYear(today(getLocalTimeZone())) },
     }
   }
 
-  let entries: Entry[] = []
+  let entries: Entry[] = [
+    MakeRow(EntryType.Expense, "Office Rent", 3000, "Facilities", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Utilities (Electricity, Water, Internet)", 500, "Facilities", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Adobe Substance 3D License", 50, "Software", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Autodesk Maya License", 200, "Software", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Unity Pro Subscription", 150, "Software", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Unreal Engine Subscription", 100, "Software", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "GitHub Enterprise", 250, "Software", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "JIRA Subscription", 100, "Software", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Slack Premium", 200, "Software", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Google Workspace", 300, "Software", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "AWS Cloud Storage", 500, "Software", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Microsoft Azure Services", 400, "Software", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Employee Salaries", 50000, "Payroll", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Freelance Developer Fees", 2000, "Payroll", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Health Insurance", 3000, "Benefits", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Office Supplies", 200, "Office", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Google Ads", 2000, "Marketing", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Facebook Ads", 1500, "Marketing", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Travel Expenses for Conferences", 1000, "Travel", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "GDC Conference Sponsorship", 5000, "Marketing", EntryInterval.Once),
+    MakeRow(EntryType.Expense, "Website Hosting", 100, "Software", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "SSL Certificates", 200, "Software", EntryInterval.Yearly),
+    MakeRow(EntryType.Expense, "Customer Support Platform (Zendesk)", 150, "Services", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Dedicated Server Hosting", 300, "Software", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Online Course Subscriptions (Coursera, Udemy)", 100, "Training", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Game Development Kits (Xbox, PlayStation)", 500, "Hardware", EntryInterval.Yearly),
+    MakeRow(EntryType.Expense, "3D Printer Maintenance", 100, "Hardware", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Sound Studio Rental", 500, "Hardware", EntryInterval.Once),
+    MakeRow(EntryType.Expense, "Office Furniture", 1500, "Office", EntryInterval.Once),
+    MakeRow(EntryType.Expense, "Animation Workshop", 1000, "Training", EntryInterval.Quarterly),
+    MakeRow(EntryType.Expense, "QA Testing Services", 1500, "Services", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Freelance Artist Fees", 2000, "Services", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Legal Fees", 500, "Legal", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Accounting Software (QuickBooks)", 50, "Software", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "ESRB Game Rating Fees", 500, "Regulatory", EntryInterval.Once),
+    MakeRow(EntryType.Expense, "Adobe Creative Cloud Subscription", 60, "Software", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Game Audio Middleware (Wwise, FMOD)", 200, "Software", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "VR Development Kit", 1000, "Hardware", EntryInterval.Once),
+    MakeRow(EntryType.Expense, "Bug Tracking Software (Bugzilla)", 100, "Software", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Animation Software (Toon Boom, Spine)", 100, "Software", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Game Localization Services", 1000, "Services", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Motion Capture Suit Rental", 1500, "Hardware", EntryInterval.Once),
+    MakeRow(EntryType.Expense, "Graphic Design Services", 1000, "Services", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Server Maintenance", 200, "Software", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Mobile Device Testing Services", 300, "Hardware", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Backup Solutions (Carbonite, Backblaze)", 100, "Software", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "General Liability Insurance", 500, "Benefits", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Postage and Shipping", 50, "Office", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Print Marketing Materials", 200, "Marketing", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Bank Transaction Fees", 50, "Financial", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Trademark Registration Fees", 300, "Regulatory", EntryInterval.Once),
+    MakeRow(EntryType.Expense, "Employee Recruitment Ads", 500, "HR", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Subscription to Industry Reports", 100, "Software", EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, "Data Analytics Tools (Mixpanel, Google Analytics)", 200, "Software", EntryInterval.Monthly)
+];
+
 
   onMount(() => {
     /*const entriesJson = localStorage.getItem('entries')
@@ -150,40 +208,56 @@
     console.log('rebuilding')
 
     let result = solver.solve(entries)
-    let newMonthlySums = solver.accumulateMonthly(result)
+    let monthlyResults = solver.accumulateMonthly(result)
+    //console.log(Array.from(result.categories))
 
-    // only update if diffrent
-    if (!deepEqual(monthlySums, newMonthlySums)) {
-      // new data
-      monthlySums = newMonthlySums
-      //localStorage.setItem('entries', JSON.stringify(entries))
-      const keys = Object.keys(monthlySums)
-      const values = keys.map(key => monthlySums[key])
-      data.labels = keys
-      data.datasets[0].data = values
-    }
+    data.labels = monthlyResults.map(item => item.label)
 
-    return
-
-    // Initialize monthlySums with 0 for all months
-    for (let i = 1; i <= 12; i++) {
-      newMonthlySums[i] = 0
-    }
-
-    // Loop through entries and accumulate amounts based on interval
-    entries.forEach(entry => {
-      if (entry.interval === 'monthly') {
-        for (let i = 1; i <= 12; i++) {
-          newMonthlySums[i] += entry.amount
-        }
-      } else if (entry.interval === 'yearly') {
-        newMonthlySums[1] += entry.amount
-      } else if (entry.interval === 'daily') {
-        for (let i = 1; i <= 12; i++) {
-          newMonthlySums[i] += entry.amount * daysInMonth(i, 2024)
-        }
-      }
+    // find all the categories
+    let categories: Set<string> = new Set()
+    monthlyResults.forEach(monthlyResult => {
+      monthlyResult.categorizedResults.forEach(categorizedResult => {
+        categories.add(categorizedResult.category)
+      })
     })
+
+    let datasets = []
+    categories.forEach(categoryName => {
+      let monthlyBalance: number[] = []
+      monthlyResults.forEach(monthlyResult => {
+        // if the current month has any expenses in this category,
+        // add the balance to the monthlyBalance array, otherwise, just add a zero.
+        let categorizedResult = monthlyResult.categorizedResults.find(e => e.category == categoryName)
+        monthlyBalance.push(categorizedResult ? categorizedResult.balance : 0)
+      })
+
+      const colors = [
+        { backgroundColor: 'rgba(255, 177, 101, 0.4)', borderColor: 'rgba(255, 177, 101, 1)' },
+        { backgroundColor: 'rgba(101, 255, 137, 0.4)', borderColor: 'rgba(101, 255, 137, 1)' },
+        { backgroundColor: 'rgba(101, 157, 255, 0.4)', borderColor: 'rgba(101, 157, 255, 1)' },
+        { backgroundColor: 'rgba(255, 101, 101, 0.4)', borderColor: 'rgba(255, 101, 101, 1)' },
+        { backgroundColor: 'rgba(255, 251, 101, 0.4)', borderColor: 'rgba(255, 251, 101, 1)' },
+        { backgroundColor: 'rgba(137, 101, 255, 0.4)', borderColor: 'rgba(137, 101, 255, 1)' },
+        { backgroundColor: 'rgba(101, 255, 241, 0.4)', borderColor: 'rgba(101, 255, 241, 1)' },
+        { backgroundColor: 'rgba(177, 101, 255, 0.4)', borderColor: 'rgba(177, 101, 255, 1)' },
+        { backgroundColor: 'rgba(255, 101, 221, 0.4)', borderColor: 'rgba(255, 101, 221, 1)' },
+        { backgroundColor: 'rgba(101, 255, 101, 0.4)', borderColor: 'rgba(101, 255, 101, 1)' },
+      ]
+
+      // add the dataset
+      datasets.push({
+        label: categoryName,
+        data: monthlyBalance,
+        backgroundColor: colors[datasets.length % colors.length].backgroundColor,
+        borderWidth: 2,
+        borderColor: colors[datasets.length % colors.length].borderColor,
+        stack: 'Sum',
+      })
+    })
+
+    data.datasets = datasets
+
+    console.log(data)
   }
 
   $: entries, rebuild()
@@ -203,7 +277,7 @@
 
   <Table.Root>
     <Table.Caption>
-      <Button on:click={() => (entries = [...entries, makeRow()])} variant="outline">Add Row</Button>
+      <Button on:click={() => (entries = [...entries, MakeRow()])} variant="outline">Add Row</Button>
     </Table.Caption>
     <Table.Header>
       <Table.Row>
@@ -237,7 +311,13 @@
             <Input type="text" placeholder="Hookers and cocaine..." bind:value={entry.description} />
           </Table.Cell>
           <Table.Cell>
-            <Select.Root selected={{ value: 'miscellaneous', label: 'miscellaneous' }}>
+            <Select.Root
+              selected={{ value: entry.category, label: entry.category }}
+              onSelectedChange={v => {
+                entry.category = v.value
+                console.log(v)
+              }}
+            >
               <Select.Trigger>
                 <Select.Value placeholder="Select a category" class="capitalize" />
               </Select.Trigger>

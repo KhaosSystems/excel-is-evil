@@ -1,4 +1,4 @@
-import type { today, getLocalTimeZone, startOfYear, endOfYear, CalendarDate } from '@internationalized/date'
+import { type today, type getLocalTimeZone, type startOfYear, type endOfYear, CalendarDate } from '@internationalized/date'
 
 export enum EntryType {
   Expense = 'expense',
@@ -27,20 +27,23 @@ export interface Entry {
   description: string
   amount: number
   interval: EntryInterval
+  category: string
   timeRange: EntryTimeRange
 }
 
 export interface TimestampEntry {
   timestamp: CalendarDate
   amount: number
+  category: string
 }
 
 export interface Result {
   timestamps: TimestampEntry[]
+  categories: Set<string>
 }
 
 export function solve(entries: Entry[]): Result {
-  let result: Result = { timestamps: [] }
+  let result: Result = { timestamps: [], categories: new Set<string>() }
 
   entries.forEach(entry => {
     try {
@@ -51,7 +54,8 @@ export function solve(entries: Entry[]): Result {
       let current = entry.timeRange.start
       let forceEnd = false
       while (!forceEnd && current <= entry.timeRange.end) {
-        result.timestamps.push({ timestamp: current, amount: entry.amount })
+        result.timestamps.push({ timestamp: current, amount: entry.amount, category: entry.category })
+        result.categories.add(entry.category)
 
         switch (entry.interval) {
           case EntryInterval.Once:
@@ -91,26 +95,42 @@ export function solve(entries: Entry[]): Result {
   return result
 }
 
-export type MonthlyResult = {
-  [month: string]: number
+export type CategorizedResult = {
+  category: string
+  balance: number
 }
 
-export function accumulateMonthly(result: Result): MonthlyResult {
-  const monthlyResult: MonthlyResult = {}
+export type MonthlyResult = {
+  date: CalendarDate
+  label: string
+  categorizedResults: CategorizedResult[]
+}
+
+export function accumulateMonthly(result: Result): MonthlyResult[] {
+  const monthlyResults: MonthlyResult[] = []
 
   result.timestamps.forEach(entry => {
     const month = entry.timestamp.month
     const year = entry.timestamp.year
-    const key = `${new Date(2000, month, 0).toLocaleString('default', { month: 'short' })} ${year}`
+    const date = new CalendarDate(year, month, 0)
+    const label = `${new Date(0, month, 0).toLocaleString('default', { month: 'short' })} ${year}`
 
-    if (!monthlyResult[key]) {
-      monthlyResult[key] = 0
+    let monthlyResult = monthlyResults.find((e) => e.date.toString() == date.toString())
+    if (!monthlyResult) {
+      let newLength = monthlyResults.push({ date: date, label: label, categorizedResults: [] })
+      monthlyResult = monthlyResults[newLength - 1]
+    }
+    
+    let categorizedResult = monthlyResult.categorizedResults.find((e) => e.category == entry.category)
+    if (!categorizedResult) {
+      let newLength = monthlyResult.categorizedResults.push({ category: entry.category, balance: entry.amount })
+      categorizedResult = monthlyResult.categorizedResults[newLength - 1]
     }
 
-    monthlyResult[key] += entry.amount
+    categorizedResult.balance += entry.amount
   })
 
-  return monthlyResult
+  return monthlyResults
 }
 
 export default {
