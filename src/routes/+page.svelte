@@ -5,6 +5,7 @@
   import * as Tabs from '$lib/components/ui/tabs'
   import * as Table from '$lib/components/ui/table'
   import * as Select from '$lib/components/ui/select'
+  import * as ToggleGroup from '$lib/components/ui/toggle-group'
   import { Input } from '$lib/components/ui/input'
   import { Chart, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale } from 'chart.js'
   import { RangeCalendar } from '$lib/components/ui/range-calendar'
@@ -125,62 +126,61 @@
   }
 
   let entries: Entry[] = [
-    MakeRow(EntryType.Expense, "Office Rent", 3000, "Facilities", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Utilities (Electricity, Water, Internet)", 500, "Facilities", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Adobe Substance 3D License", 50, "Software", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Autodesk Maya License", 200, "Software", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Unity Pro Subscription", 150, "Software", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Unreal Engine Subscription", 100, "Software", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "GitHub Enterprise", 250, "Software", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "JIRA Subscription", 100, "Software", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Slack Premium", 200, "Software", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Google Workspace", 300, "Software", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "AWS Cloud Storage", 500, "Software", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Microsoft Azure Services", 400, "Software", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Employee Salaries", 50000, "Payroll", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Freelance Developer Fees", 2000, "Payroll", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Health Insurance", 3000, "Benefits", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Office Supplies", 200, "Office", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Google Ads", 2000, "Marketing", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Facebook Ads", 1500, "Marketing", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Travel Expenses for Conferences", 1000, "Travel", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "GDC Conference Sponsorship", 5000, "Marketing", EntryInterval.Once),
-    MakeRow(EntryType.Expense, "Website Hosting", 100, "Software", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "SSL Certificates", 200, "Software", EntryInterval.Yearly),
-    MakeRow(EntryType.Expense, "Customer Support Platform (Zendesk)", 150, "Services", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Dedicated Server Hosting", 300, "Software", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Online Course Subscriptions (Coursera, Udemy)", 100, "Training", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Game Development Kits (Xbox, PlayStation)", 500, "Hardware", EntryInterval.Yearly),
-    MakeRow(EntryType.Expense, "3D Printer Maintenance", 100, "Hardware", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Sound Studio Rental", 500, "Hardware", EntryInterval.Once),
-    MakeRow(EntryType.Expense, "Office Furniture", 1500, "Office", EntryInterval.Once),
-    MakeRow(EntryType.Expense, "Animation Workshop", 1000, "Training", EntryInterval.Quarterly),
-    MakeRow(EntryType.Expense, "QA Testing Services", 1500, "Services", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Freelance Artist Fees", 2000, "Services", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Legal Fees", 500, "Legal", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Accounting Software (QuickBooks)", 50, "Software", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "ESRB Game Rating Fees", 500, "Regulatory", EntryInterval.Once),
-    MakeRow(EntryType.Expense, "Adobe Creative Cloud Subscription", 60, "Software", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Game Audio Middleware (Wwise, FMOD)", 200, "Software", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "VR Development Kit", 1000, "Hardware", EntryInterval.Once),
-    MakeRow(EntryType.Expense, "Bug Tracking Software (Bugzilla)", 100, "Software", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Animation Software (Toon Boom, Spine)", 100, "Software", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Game Localization Services", 1000, "Services", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Motion Capture Suit Rental", 1500, "Hardware", EntryInterval.Once),
-    MakeRow(EntryType.Expense, "Graphic Design Services", 1000, "Services", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Server Maintenance", 200, "Software", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Mobile Device Testing Services", 300, "Hardware", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Backup Solutions (Carbonite, Backblaze)", 100, "Software", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "General Liability Insurance", 500, "Benefits", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Postage and Shipping", 50, "Office", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Print Marketing Materials", 200, "Marketing", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Bank Transaction Fees", 50, "Financial", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Trademark Registration Fees", 300, "Regulatory", EntryInterval.Once),
-    MakeRow(EntryType.Expense, "Employee Recruitment Ads", 500, "HR", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Subscription to Industry Reports", 100, "Software", EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, "Data Analytics Tools (Mixpanel, Google Analytics)", 200, "Software", EntryInterval.Monthly)
-];
-
+    MakeRow(EntryType.Expense, 'Office Rent', 3000, 'Facilities', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Utilities (Electricity, Water, Internet)', 500, 'Facilities', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Adobe Substance 3D License', 50, 'Software', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Autodesk Maya License', 200, 'Software', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Unity Pro Subscription', 150, 'Software', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Unreal Engine Subscription', 100, 'Software', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'GitHub Enterprise', 250, 'Software', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'JIRA Subscription', 100, 'Software', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Slack Premium', 200, 'Software', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Google Workspace', 300, 'Software', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'AWS Cloud Storage', 500, 'Software', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Microsoft Azure Services', 400, 'Software', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Employee Salaries', 50000, 'Payroll', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Freelance Developer Fees', 2000, 'Payroll', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Health Insurance', 3000, 'Benefits', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Office Supplies', 200, 'Office', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Google Ads', 2000, 'Marketing', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Facebook Ads', 1500, 'Marketing', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Travel Expenses for Conferences', 1000, 'Travel', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'GDC Conference Sponsorship', 5000, 'Marketing', EntryInterval.Once),
+    MakeRow(EntryType.Expense, 'Website Hosting', 100, 'Software', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'SSL Certificates', 200, 'Software', EntryInterval.Yearly),
+    MakeRow(EntryType.Expense, 'Customer Support Platform (Zendesk)', 150, 'Services', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Dedicated Server Hosting', 300, 'Software', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Online Course Subscriptions (Coursera, Udemy)', 100, 'Training', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Game Development Kits (Xbox, PlayStation)', 500, 'Hardware', EntryInterval.Yearly),
+    MakeRow(EntryType.Expense, '3D Printer Maintenance', 100, 'Hardware', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Sound Studio Rental', 500, 'Hardware', EntryInterval.Once),
+    MakeRow(EntryType.Expense, 'Office Furniture', 1500, 'Office', EntryInterval.Once),
+    MakeRow(EntryType.Expense, 'Animation Workshop', 1000, 'Training', EntryInterval.Quarterly),
+    MakeRow(EntryType.Expense, 'QA Testing Services', 1500, 'Services', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Freelance Artist Fees', 2000, 'Services', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Legal Fees', 500, 'Legal', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Accounting Software (QuickBooks)', 50, 'Software', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'ESRB Game Rating Fees', 500, 'Regulatory', EntryInterval.Once),
+    MakeRow(EntryType.Expense, 'Adobe Creative Cloud Subscription', 60, 'Software', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Game Audio Middleware (Wwise, FMOD)', 200, 'Software', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'VR Development Kit', 1000, 'Hardware', EntryInterval.Once),
+    MakeRow(EntryType.Expense, 'Bug Tracking Software (Bugzilla)', 100, 'Software', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Animation Software (Toon Boom, Spine)', 100, 'Software', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Game Localization Services', 1000, 'Services', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Motion Capture Suit Rental', 1500, 'Hardware', EntryInterval.Once),
+    MakeRow(EntryType.Expense, 'Graphic Design Services', 1000, 'Services', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Server Maintenance', 200, 'Software', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Mobile Device Testing Services', 300, 'Hardware', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Backup Solutions (Carbonite, Backblaze)', 100, 'Software', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'General Liability Insurance', 500, 'Benefits', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Postage and Shipping', 50, 'Office', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Print Marketing Materials', 200, 'Marketing', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Bank Transaction Fees', 50, 'Financial', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Trademark Registration Fees', 300, 'Regulatory', EntryInterval.Once),
+    MakeRow(EntryType.Expense, 'Employee Recruitment Ads', 500, 'HR', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Subscription to Industry Reports', 100, 'Software', EntryInterval.Monthly),
+    MakeRow(EntryType.Expense, 'Data Analytics Tools (Mixpanel, Google Analytics)', 200, 'Software', EntryInterval.Monthly),
+  ]
 
   onMount(() => {
     /*const entriesJson = localStorage.getItem('entries')
@@ -204,6 +204,19 @@
     return JSON.stringify(x) == JSON.stringify(y)
   }
 
+  const colors = [
+    { backgroundColor: 'rgba(255, 177, 101, 0.4)', borderColor: 'rgba(255, 177, 101, 1)' },
+    { backgroundColor: 'rgba(101, 255, 137, 0.4)', borderColor: 'rgba(101, 255, 137, 1)' },
+    { backgroundColor: 'rgba(101, 157, 255, 0.4)', borderColor: 'rgba(101, 157, 255, 1)' },
+    { backgroundColor: 'rgba(255, 101, 101, 0.4)', borderColor: 'rgba(255, 101, 101, 1)' },
+    { backgroundColor: 'rgba(255, 251, 101, 0.4)', borderColor: 'rgba(255, 251, 101, 1)' },
+    { backgroundColor: 'rgba(137, 101, 255, 0.4)', borderColor: 'rgba(137, 101, 255, 1)' },
+    { backgroundColor: 'rgba(101, 255, 241, 0.4)', borderColor: 'rgba(101, 255, 241, 1)' },
+    { backgroundColor: 'rgba(177, 101, 255, 0.4)', borderColor: 'rgba(177, 101, 255, 1)' },
+    { backgroundColor: 'rgba(255, 101, 221, 0.4)', borderColor: 'rgba(255, 101, 221, 1)' },
+    { backgroundColor: 'rgba(101, 255, 101, 0.4)', borderColor: 'rgba(101, 255, 101, 1)' },
+  ]
+
   function rebuild() {
     console.log('rebuilding')
 
@@ -221,6 +234,19 @@
       })
     })
 
+    // build category toggles
+    categories.forEach(category => {
+      let toggle = categoryToggles.find(e => e.category == category)
+      if (!toggle) {
+        categoryToggles.push({
+          category,
+          enabled: true,
+          color: colors[categoryToggles.length % colors.length],
+        })
+      }
+      categoryToggles = categoryToggles // force reactivity
+    })
+
     let datasets = []
     categories.forEach(categoryName => {
       let monthlyBalance: number[] = []
@@ -231,28 +257,17 @@
         monthlyBalance.push(categorizedResult ? categorizedResult.balance : 0)
       })
 
-      const colors = [
-        { backgroundColor: 'rgba(255, 177, 101, 0.4)', borderColor: 'rgba(255, 177, 101, 1)' },
-        { backgroundColor: 'rgba(101, 255, 137, 0.4)', borderColor: 'rgba(101, 255, 137, 1)' },
-        { backgroundColor: 'rgba(101, 157, 255, 0.4)', borderColor: 'rgba(101, 157, 255, 1)' },
-        { backgroundColor: 'rgba(255, 101, 101, 0.4)', borderColor: 'rgba(255, 101, 101, 1)' },
-        { backgroundColor: 'rgba(255, 251, 101, 0.4)', borderColor: 'rgba(255, 251, 101, 1)' },
-        { backgroundColor: 'rgba(137, 101, 255, 0.4)', borderColor: 'rgba(137, 101, 255, 1)' },
-        { backgroundColor: 'rgba(101, 255, 241, 0.4)', borderColor: 'rgba(101, 255, 241, 1)' },
-        { backgroundColor: 'rgba(177, 101, 255, 0.4)', borderColor: 'rgba(177, 101, 255, 1)' },
-        { backgroundColor: 'rgba(255, 101, 221, 0.4)', borderColor: 'rgba(255, 101, 221, 1)' },
-        { backgroundColor: 'rgba(101, 255, 101, 0.4)', borderColor: 'rgba(101, 255, 101, 1)' },
-      ]
-
-      // add the dataset
-      datasets.push({
-        label: categoryName,
-        data: monthlyBalance,
-        backgroundColor: colors[datasets.length % colors.length].backgroundColor,
-        borderWidth: 2,
-        borderColor: colors[datasets.length % colors.length].borderColor,
-        stack: 'Sum',
-      })
+      // add the dataset if toggle is enabled
+      if (categoryToggles.find(e => e.category == categoryName).enabled) {
+        datasets.push({
+          label: categoryName,
+          data: monthlyBalance,
+          backgroundColor: colors[datasets.length % colors.length].backgroundColor,
+          borderWidth: 2,
+          borderColor: colors[datasets.length % colors.length].borderColor,
+          stack: 'Sum',
+        })
+      }
     })
 
     data.datasets = datasets
@@ -260,20 +275,36 @@
     console.log(data)
   }
 
+  let categoryToggles = []
+
   $: entries, rebuild()
+  $: categoryToggles, rebuild()
 </script>
 
 <div class="flex flex-col p-8 gap-2">
   <div class="flex justify-center w-full h-96 mb-6">
-    <Bar {data} options={{ responsive: true, maintainAspectRatio: false }} />
+    <Bar {data} options={{ responsive: true, maintainAspectRatio: false, animation: { duration: 0 } }} />
   </div>
 
   <Alert.Root class="text-orange-400">
     <Alert.Description>
       <TriangleAlert class="h-4 w-4 inline mr-1" />
-      The currency and category fields are currently not implemented.
+      The currency fields are currently not implemented. Saving is also missing, and category toggles.
     </Alert.Description>
   </Alert.Root>
+
+  <div class="flex flex-row gap-2 justify-center">
+    {#each categoryToggles as categoryToggle}
+      <Button
+        style={`opacity: ${categoryToggle.enabled ? '1.0' : '0.3'};background-color: ${categoryToggle.color.backgroundColor}; color: ${categoryToggle.color.borderColor}; border-color: ${categoryToggle.color.borderColor}`}
+        class="border-2 font-semibold"
+        on:click={() => {
+          categoryToggle.enabled = !categoryToggle.enabled
+        }}
+        value={categoryToggle.category}>{categoryToggle.category}</Button
+      >
+    {/each}
+  </div>
 
   <Table.Root>
     <Table.Caption>
