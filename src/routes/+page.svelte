@@ -7,6 +7,12 @@
   import * as Select from '$lib/components/ui/select'
   import { Input } from '$lib/components/ui/input'
   import { Chart, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale } from 'chart.js'
+  import { RangeCalendar } from '$lib/components/ui/range-calendar'
+  import { today, getLocalTimeZone, startOfYear, endOfYear } from '@internationalized/date'
+  import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
+  import { CalendarRange } from 'lucide-svelte'
+  import solver, { EntryInterval, EntryType, type Entry, type Result as SolverResult } from '$lib/solver'
+  import { writable } from 'svelte/store'
 
   Chart.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale)
 
@@ -21,13 +27,6 @@
         backgroundColor: 'rgba(255, 177, 101, 0.4)',
         borderWidth: 2,
         borderColor: 'rgba(255, 177, 101, 1)',
-      },
-      {
-        label: 'Actual Expenses',
-        data: [],
-        backgroundColor: 'rgba(255, 80, 80, 0.4)',
-        borderWidth: 2,
-        borderColor: 'rgba(255, 80, 80, 1)',
       },
     ],
   }
@@ -85,7 +84,13 @@
       const values = keys.map(key => monthlySums[key])
       console.log(keys)
       console.log(values)
-      data.datasets[1].data = values
+      data.datasets.push({
+        label: 'Actual Expenses',
+        data: values,
+        backgroundColor: 'rgba(255, 80, 80, 0.4)',
+        borderWidth: 2,
+        borderColor: 'rgba(255, 80, 80, 1)',
+      })
     }
 
     reader.readAsArrayBuffer(file)
@@ -101,15 +106,32 @@
   // Initialize an empty object to store the sums for each month
   let monthlySums = {}
 
-  const makeDefaultRow = () => {
-    return { type: 'expense', description: 'description', amount: 0, interval: 'monthly' }
+  const makeRow = (
+    type: EntryType = EntryType.Expense,
+    description: string = 'description',
+    amount: number = 0,
+    interval: EntryInterval = EntryInterval.Monthly,
+  ) => {
+    return {
+      type: type,
+      description: description,
+      amount: amount,
+      interval: interval,
+      timeRange: { start: startOfYear(today(getLocalTimeZone())), end: endOfYear(today(getLocalTimeZone())) },
+    }
   }
 
-  let entries = [
-    { type: 'expense', description: 'Lunch', amount: 90, interval: 'daily' },
-    { type: 'expense', description: 'Adobe Substance 3D', amount: 342, interval: 'monthly' },
-    { type: 'expense', description: 'ZBrush', amount: 3040, interval: 'yearly' },
-  ]
+  let entries: Entry[] = []
+
+  onMount(() => {
+    /*const entriesJson = localStorage.getItem('entries')
+    if (entriesJson) {
+      console.log(entriesJson)
+      entries = JSON.parse(entriesJson)
+      console.log(entries)
+      rebuild()
+    }*/
+  })
 
   function daysInMonth(month, year) {
     return new Date(year, month, 0).getDate()
@@ -126,7 +148,21 @@
   function rebuild() {
     console.log('rebuilding')
 
-    let newMonthlySums = {}
+    let result = solver.solve(entries)
+    let newMonthlySums = solver.accumulateMonthly(result)
+
+    // only update if diffrent
+    if (!deepEqual(monthlySums, newMonthlySums)) {
+      // new data
+      monthlySums = newMonthlySums
+      //localStorage.setItem('entries', JSON.stringify(entries))
+      const keys = Object.keys(monthlySums)
+      const values = keys.map(key => monthlySums[key])
+      data.labels = keys
+      data.datasets[0].data = values
+    }
+
+    return
 
     // Initialize monthlySums with 0 for all months
     for (let i = 1; i <= 12; i++) {
@@ -147,21 +183,13 @@
         }
       }
     })
-
-    // only update if diffrent
-    if (!deepEqual(monthlySums, newMonthlySums)) {
-      // new data
-      monthlySums = newMonthlySums
-      const keys = Object.keys(monthlySums)
-      const values = keys.map(key => monthlySums[key])
-      data.labels = keys
-      data.datasets[0].data = values
-    }
   }
+
+  $: entries, rebuild()
 </script>
 
 <div class="p-8">
-  <div class="flex justify-center w-full h-96">
+  <div class="flex justify-center w-full h-96 mb-6">
     <Bar {data} options={{ responsive: true }} />
   </div>
 
@@ -173,7 +201,7 @@
     <Tabs.Content value="budgeteditor">
       <Table.Root>
         <Table.Caption>
-          <Button on:click={() => (entries = [...entries, makeDefaultRow()])}>Add Row</Button>
+          <Button on:click={() => (entries = [...entries, makeRow()])} variant="outline">Add Row</Button>
         </Table.Caption>
         <Table.Header>
           <Table.Row>
@@ -181,6 +209,7 @@
             <Table.Head>Description</Table.Head>
             <Table.Head class="w-40">Amount</Table.Head>
             <Table.Head class="w-40">Interval</Table.Head>
+            <Table.Head class="w-40">Calendar Range</Table.Head>
           </Table.Row>
         </Table.Header>
         <Table.Body>
@@ -193,8 +222,9 @@
                   </Select.Trigger>
                   <Select.Content>
                     <Select.Group>
-                      <Select.Item value="expense" class="capitalize">expense</Select.Item>
-                      <Select.Item value="income" class="capitalize">income</Select.Item>
+                      {#each Object.values(EntryType) as value}
+                        <Select.Item {value} class="capitalize">{value}</Select.Item>
+                      {/each}
                     </Select.Group>
                   </Select.Content>
                   <Select.Input />
@@ -226,18 +256,27 @@
                     <Select.Value placeholder="Select an interval" class="capitalize" />
                   </Select.Trigger>
                   <Select.Content>
-                    <Select.Group
-                      ><Select.Item value="daily" class="capitalize">daily</Select.Item>
-                      <Select.Item value="weekly" class="capitalize">weekly</Select.Item>
-                      <Select.Item value="biweekly" class="capitalize">biweekly</Select.Item>
-                      <Select.Item value="monthly" class="capitalize">monthly</Select.Item>
-                      <Select.Item value="quarterly" class="capitalize">quarterly</Select.Item>
-                      <Select.Item value="semiannually" class="capitalize">semiannually</Select.Item>
-                      <Select.Item value="yearly" class="capitalize">yearly</Select.Item>
+                    <Select.Group>
+                      {#each Object.values(EntryInterval) as value}
+                        <Select.Item {value} class="capitalize">{value}</Select.Item>
+                      {/each}
                     </Select.Group>
                   </Select.Content>
                   <Select.Input name="favoriteFruit" />
                 </Select.Root>
+              </Table.Cell>
+              <Table.Cell>
+                <DropdownMenu.Root>
+                  <DropdownMenu.Trigger asChild let:builder>
+                    <Button builders={[builder]} variant="outline">
+                      <CalendarRange size="20" class="mr-2" />
+                      {entry.timeRange.start} / {entry.timeRange.end}
+                    </Button>
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Content>
+                    <RangeCalendar bind:value={entry.timeRange} class="rounded-md border shadow" />
+                  </DropdownMenu.Content>
+                </DropdownMenu.Root>
               </Table.Cell>
             </Table.Row>
           {/each}
@@ -277,5 +316,3 @@
     </Tabs.Content>
   </Tabs.Root>
 </div>
-
-{changes}
