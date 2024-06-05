@@ -197,7 +197,7 @@
   <Alert.Root class="text-orange-400">
     <Alert.Description>
       <TriangleAlert class="h-4 w-4 inline mr-1" />
-      The valuta and category fields are currently not implemented.
+      The currency and category fields are currently not implemented.
     </Alert.Description>
   </Alert.Root>
 
