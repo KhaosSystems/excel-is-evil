@@ -293,7 +293,7 @@
     </Alert.Description>
   </Alert.Root>
 
-  <div class="flex flex-row gap-2 justify-center">
+  <div class="flex flex-row flex-wrap gap-2 justify-center">
     {#each categoryToggles as categoryToggle}
       <Button
         style={`opacity: ${categoryToggle.enabled ? '1.0' : '0.3'};background-color: ${categoryToggle.color.backgroundColor}; color: ${categoryToggle.color.borderColor}; border-color: ${categoryToggle.color.borderColor}`}
