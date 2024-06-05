@@ -10,9 +10,10 @@
   import { RangeCalendar } from '$lib/components/ui/range-calendar'
   import { today, getLocalTimeZone, startOfYear, endOfYear } from '@internationalized/date'
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
-  import { CalendarRange } from 'lucide-svelte'
+  import { CalendarRange, TriangleAlert } from 'lucide-svelte'
   import solver, { EntryInterval, EntryType, type Entry, type Result as SolverResult } from '$lib/solver'
   import { writable } from 'svelte/store'
+  import * as Alert from '$lib/components/ui/alert'
 
   Chart.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale)
 
@@ -188,101 +189,148 @@
   $: entries, rebuild()
 </script>
 
-<div class="p-8">
+<div class="flex flex-col p-8 gap-2">
   <div class="flex justify-center w-full h-96 mb-6">
-    <Bar {data} options={{ responsive: true }} />
+    <Bar {data} options={{ responsive: true, maintainAspectRatio: false }} />
   </div>
 
+  <Alert.Root class="text-orange-400">
+    <Alert.Description>
+      <TriangleAlert class="h-4 w-4 inline mr-1" />
+      The valuta and category fields are currently not implemented.
+    </Alert.Description>
+  </Alert.Root>
+
+  <Table.Root>
+    <Table.Caption>
+      <Button on:click={() => (entries = [...entries, makeRow()])} variant="outline">Add Row</Button>
+    </Table.Caption>
+    <Table.Header>
+      <Table.Row>
+        <Table.Head class="w-40">Type</Table.Head>
+        <Table.Head>Description</Table.Head>
+        <Table.Head class="w-48">Catagory</Table.Head>
+        <Table.Head class="w-40">Amount</Table.Head>
+        <Table.Head class="w-40">Interval</Table.Head>
+        <Table.Head class="w-40">Calendar Range</Table.Head>
+      </Table.Row>
+    </Table.Header>
+    <Table.Body>
+      {#each entries as entry}
+        <Table.Row>
+          <Table.Cell>
+            <Select.Root selected={{ value: entry.type, label: entry.type }}>
+              <Select.Trigger>
+                <Select.Value placeholder="Select a type" class="capitalize" />
+              </Select.Trigger>
+              <Select.Content>
+                <Select.Group>
+                  {#each Object.values(EntryType) as value}
+                    <Select.Item {value} class="capitalize">{value}</Select.Item>
+                  {/each}
+                </Select.Group>
+              </Select.Content>
+              <Select.Input />
+            </Select.Root>
+          </Table.Cell>
+          <Table.Cell>
+            <Input type="text" placeholder="Hookers and cocaine..." bind:value={entry.description} />
+          </Table.Cell>
+          <Table.Cell>
+            <Select.Root selected={{ value: 'miscellaneous', label: 'miscellaneous' }}>
+              <Select.Trigger>
+                <Select.Value placeholder="Select a category" class="capitalize" />
+              </Select.Trigger>
+              <Select.Content>
+                <Select.Group>
+                  <Select.Item value="miscellaneous" class="capitalize">miscellaneous</Select.Item>
+                  <Select.Item value="payroll" class="capitalize">payroll</Select.Item>
+                  <Select.Item value="utilities" class="capitalize">utilities</Select.Item>
+                  <Select.Item value="insurance" class="capitalize">insurance</Select.Item>
+                  <Select.Item value="taining" class="capitalize">taining</Select.Item>
+                  <Select.Item value="travel" class="capitalize">travel</Select.Item>
+                  <Select.Item value="website" class="capitalize">website</Select.Item>
+                  <Select.Item value="software" class="capitalize">software</Select.Item>
+                  <Select.Item value="hardware" class="capitalize">hardware</Select.Item>
+                  <Select.Item value="office" class="capitalize">office</Select.Item>
+                  <Select.Item value="server" class="capitalize">server</Select.Item>
+                  <Select.Item value="rent" class="capitalize">rent</Select.Item>
+                  <Select.Item value="catering" class="capitalize">catering</Select.Item>
+                </Select.Group>
+              </Select.Content>
+              <Select.Input name="favoriteFruit" />
+            </Select.Root>
+          </Table.Cell>
+          <Table.Cell class="flex flex-row">
+            <Input
+              type="number"
+              class="w-24 rounded-r-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              placeholder="1234.56"
+              value={entry.amount}
+              on:input={e => {
+                e.target.value = Number(e.target.value)
+                entry.amount = Number(e.target.value)
+              }}
+            />
+            <Select.Root>
+              <Select.Trigger class="rounded-l-none border-l-0">
+                <Select.Value placeholder="DKK" class="capitalize" />
+              </Select.Trigger>
+              <Select.Content>
+                <Select.Group>
+                  <Select.Item value="usd" class="capitalize">USD</Select.Item>
+                  <Select.Item value="eur" class="capitalize">EUR</Select.Item>
+                  <Select.Item value="dkk" class="capitalize">DKK</Select.Item>
+                </Select.Group>
+              </Select.Content>
+              <Select.Input name="favoriteFruit" />
+            </Select.Root>
+          </Table.Cell>
+          <Table.Cell>
+            <Select.Root
+              selected={{ value: entry.interval, label: entry.interval }}
+              onSelectedChange={v => {
+                entry.interval = v.value
+                console.log(v)
+              }}
+            >
+              <Select.Trigger>
+                <Select.Value placeholder="Select an interval" class="capitalize" />
+              </Select.Trigger>
+              <Select.Content>
+                <Select.Group>
+                  {#each Object.values(EntryInterval) as value}
+                    <Select.Item {value} class="capitalize">{value}</Select.Item>
+                  {/each}
+                </Select.Group>
+              </Select.Content>
+              <Select.Input name="favoriteFruit" />
+            </Select.Root>
+          </Table.Cell>
+          <Table.Cell>
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger asChild let:builder>
+                <Button builders={[builder]} variant="outline">
+                  <CalendarRange size="20" class="mr-2" />
+                  {entry.timeRange.start} / {entry.timeRange.end}
+                </Button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Content>
+                <RangeCalendar bind:value={entry.timeRange} class="rounded-md border shadow" />
+              </DropdownMenu.Content>
+            </DropdownMenu.Root>
+          </Table.Cell>
+        </Table.Row>
+      {/each}
+    </Table.Body>
+  </Table.Root>
+
   <Tabs.Root value="budgeteditor" class="w-full">
-    <Tabs.List class="w-full">
+    <Tabs.List>
       <Tabs.Trigger value="budgeteditor">Budget Editor</Tabs.Trigger>
       <Tabs.Trigger value="production">Production</Tabs.Trigger>
     </Tabs.List>
-    <Tabs.Content value="budgeteditor">
-      <Table.Root>
-        <Table.Caption>
-          <Button on:click={() => (entries = [...entries, makeRow()])} variant="outline">Add Row</Button>
-        </Table.Caption>
-        <Table.Header>
-          <Table.Row>
-            <Table.Head class="w-40">Type</Table.Head>
-            <Table.Head>Description</Table.Head>
-            <Table.Head class="w-40">Amount</Table.Head>
-            <Table.Head class="w-40">Interval</Table.Head>
-            <Table.Head class="w-40">Calendar Range</Table.Head>
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
-          {#each entries as entry}
-            <Table.Row>
-              <Table.Cell>
-                <Select.Root selected={{ value: entry.type, label: entry.type }}>
-                  <Select.Trigger>
-                    <Select.Value placeholder="Select a type" class="capitalize" />
-                  </Select.Trigger>
-                  <Select.Content>
-                    <Select.Group>
-                      {#each Object.values(EntryType) as value}
-                        <Select.Item {value} class="capitalize">{value}</Select.Item>
-                      {/each}
-                    </Select.Group>
-                  </Select.Content>
-                  <Select.Input />
-                </Select.Root>
-              </Table.Cell>
-              <Table.Cell>
-                <Input type="text" placeholder="Hookers and cocaine..." bind:value={entry.description} />
-              </Table.Cell>
-              <Table.Cell>
-                <Input
-                  type="number"
-                  placeholder="1234.56"
-                  value={entry.amount}
-                  on:input={e => {
-                    e.target.value = Number(e.target.value)
-                    entry.amount = Number(e.target.value)
-                  }}
-                />
-              </Table.Cell>
-              <Table.Cell>
-                <Select.Root
-                  selected={{ value: entry.interval, label: entry.interval }}
-                  onSelectedChange={v => {
-                    entry.interval = v.value
-                    console.log(v)
-                  }}
-                >
-                  <Select.Trigger>
-                    <Select.Value placeholder="Select an interval" class="capitalize" />
-                  </Select.Trigger>
-                  <Select.Content>
-                    <Select.Group>
-                      {#each Object.values(EntryInterval) as value}
-                        <Select.Item {value} class="capitalize">{value}</Select.Item>
-                      {/each}
-                    </Select.Group>
-                  </Select.Content>
-                  <Select.Input name="favoriteFruit" />
-                </Select.Root>
-              </Table.Cell>
-              <Table.Cell>
-                <DropdownMenu.Root>
-                  <DropdownMenu.Trigger asChild let:builder>
-                    <Button builders={[builder]} variant="outline">
-                      <CalendarRange size="20" class="mr-2" />
-                      {entry.timeRange.start} / {entry.timeRange.end}
-                    </Button>
-                  </DropdownMenu.Trigger>
-                  <DropdownMenu.Content>
-                    <RangeCalendar bind:value={entry.timeRange} class="rounded-md border shadow" />
-                  </DropdownMenu.Content>
-                </DropdownMenu.Root>
-              </Table.Cell>
-            </Table.Row>
-          {/each}
-        </Table.Body>
-      </Table.Root>
-    </Tabs.Content>
+    <Tabs.Content value="budgeteditor"></Tabs.Content>
     <Tabs.Content value="production">
       <div class="flex gap-4">
         Offset
