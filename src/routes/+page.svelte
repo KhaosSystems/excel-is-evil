@@ -261,7 +261,7 @@
       if (categoryToggles.find(e => e.category == categoryName).enabled) {
         datasets.push({
           label: categoryName,
-          data: monthlyBalance,
+          data: monthlyBalance,F
           backgroundColor: colors[datasets.length % colors.length].backgroundColor,
           borderWidth: 2,
           borderColor: colors[datasets.length % colors.length].borderColor,
@@ -452,7 +452,7 @@
       {#if rows.length || headers.length}
         <Table.Root>
           <Table.Caption>
-            <Button on:click={() => (entries = [...entries, makeDefaultRow()])}>Add Row</Button>
+            <Button>Add Row</Button>
           </Table.Caption>
           <Table.Header>
             <Table.Row>
