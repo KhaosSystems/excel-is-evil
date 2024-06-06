@@ -180,7 +180,7 @@
 
   onMount(async () => {
     // load from local storage
-    let rows = JSON.parse(localStorage.entries)
+    let rows = localStorage.entries ? JSON.parse(localStorage.entries) : []
     let newEntries = await rows.map(entry => {
       let unflattenedEntry: Entry = unflatten(entry)
       // Restore prototype for start and end dates
