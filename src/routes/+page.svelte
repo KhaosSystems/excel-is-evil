@@ -188,9 +188,10 @@
       unflattenedEntry.timeRange.end = new CalendarDate( unflattenedEntry.timeRange.end.year, unflattenedEntry.timeRange.end.month, unflattenedEntry.timeRange.end.day)
       return unflattenedEntry
     })
+
     // entries
-     entries.subscribe(e => { localStorage.entries = JSON.stringify(e) })
-     entries.subscribe(e => { rebuild() })
+    entries.subscribe(e => { localStorage.entries = JSON.stringify(e) })
+    entries.subscribe(e => { rebuild() })
     entries.set(newEntries)
   })
 
@@ -345,10 +346,7 @@
               <Input type="text" placeholder="Hookers and cocaine..." bind:value={entry.description} />
             </Table.Cell>
             <Table.Cell>
-              <Select.Root
-                selected={{ value: entry.category, label: entry.category }}
-                onSelectedChange={v => { entry.category = v.value }}
-              >
+              <Select.Root selected={{ value: entry.category, label: entry.category }} onSelectedChange={v => { entry.category = v.value }}>
                 <Select.Trigger>
                   <Select.Value placeholder="Select a category" class="capitalize" />
                 </Select.Trigger>
@@ -373,23 +371,15 @@
               </Select.Root>
             </Table.Cell>
             <Table.Cell class="flex flex-row">
-              <Input
-                type="number"
+              <Input type="number" placeholder="1234.56" value={entry.amount}
                 class="w-20 rounded-r-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                placeholder="1234.56"
-                value={entry.amount}
                 on:input={e => {
                   e.target.value = Number(e.target.value)
                   entry.amount = Number(e.target.value)
                 }}
               />
               <!-- Currency -->
-              <Select.Root
-                selected={{ value: entry.currency, label: entry.currency.code }}
-                onSelectedChange={v => {
-                  entry.currency = v.value
-                }}
-              >
+              <Select.Root selected={{ value: entry.currency, label: entry.currency.code }} onSelectedChange={v => { entry.currency = v.value }}>
                 <Select.Trigger class="rounded-l-none border-l-0">
                   <Select.Value placeholder="DKK" class="capitalize" />
                 </Select.Trigger>
@@ -480,7 +470,7 @@
     <Alert.Root class="text-orange-400">
       <Alert.Description>
         <TriangleAlert class="h-4 w-4 inline mr-1" />
-        Missing features: saving, working category colors (also on select)
+        Missing features: deleting rows, loading e-conomics, working category colors (also on select)
       </Alert.Description>
     </Alert.Root>
   </div>
