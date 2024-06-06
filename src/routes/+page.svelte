@@ -15,6 +15,7 @@
   import solver, { EntryInterval, EntryType, type Entry, type Result as SolverResult } from '$lib/solver'
   import { writable } from 'svelte/store'
   import * as Alert from '$lib/components/ui/alert'
+  import { fetchExchangeRates, type ExchangeRates } from '$lib/services/exchangeRates'
 
   Chart.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale)
 
@@ -182,7 +183,16 @@
     MakeRow(EntryType.Expense, 'Data Analytics Tools (Mixpanel, Google Analytics)', 200, 'Software', EntryInterval.Monthly),
   ]
 
-  onMount(() => {
+  // Everything is based on the value of the euro
+  let exchangeRates: ExchangeRates = {}
+  onMount(async () => {
+    // Does not work. CORS error.
+    //exchangeRates = (await fetchExchangeRates()) || {}
+
+    exchangeRates["EUR"] = 1
+    exchangeRates["DKK"] = 7.46
+    exchangeRates["USD"] = 1.09 
+
     /*const entriesJson = localStorage.getItem('entries')
     if (entriesJson) {
       console.log(entriesJson)
@@ -385,15 +395,15 @@
                 entry.amount = Number(e.target.value)
               }}
             />
-            <Select.Root>
+            <Select.Root selected={{ value: 'DKK', label: 'DKK' }}>
               <Select.Trigger class="rounded-l-none border-l-0">
                 <Select.Value placeholder="DKK" class="capitalize" />
               </Select.Trigger>
               <Select.Content>
                 <Select.Group>
-                  <Select.Item value="usd" class="capitalize">USD</Select.Item>
-                  <Select.Item value="eur" class="capitalize">EUR</Select.Item>
-                  <Select.Item value="dkk" class="capitalize">DKK</Select.Item>
+                  {#each Object.keys(exchangeRates) as currency}
+                    <Select.Item value={currency} class="uppercase">{currency}</Select.Item>
+                  {/each}
                 </Select.Group>
               </Select.Content>
               <Select.Input name="favoriteFruit" />
