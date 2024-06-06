@@ -1,41 +1,47 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
-  import { Bar } from 'svelte-chartjs'
-  import { Button } from '$lib/components/ui/button'
   import * as Tabs from '$lib/components/ui/tabs'
   import * as Table from '$lib/components/ui/table'
   import * as Select from '$lib/components/ui/select'
-  import * as ToggleGroup from '$lib/components/ui/toggle-group'
-  import * as AlertDialog from "$lib/components/ui/alert-dialog";
+  import * as AlertDialog from '$lib/components/ui/alert-dialog'
+  import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
+  import * as Alert from '$lib/components/ui/alert'
+  import { onMount } from 'svelte'
+  import { Bar } from 'svelte-chartjs'
+  import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
-  import { Chart, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale } from 'chart.js'
+  import { Chart, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, type ChartData } from 'chart.js'
   import { RangeCalendar } from '$lib/components/ui/range-calendar'
   import { today, getLocalTimeZone, startOfYear, endOfYear, CalendarDate } from '@internationalized/date'
-  import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
   import { CalendarRange, TriangleAlert, Upload, Download, X } from 'lucide-svelte'
   import solver, { EntryInterval, EntryType, type Entry, type Result as SolverResult, type EntryTimeRange, type Currency } from '$lib/solver'
-  import { writable } from 'svelte/store'
-  import * as Alert from '$lib/components/ui/alert'
+  import { get, writable, type Writable } from 'svelte/store'
   import { flatten, unflatten } from 'flat'
+  import { read, utils, writeFileXLSX } from 'xlsx'
 
   Chart.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale)
 
+  let currencies: Currency[] = [
+    { code: 'EUR', rate: 1 },
+    { code: 'DKK', rate: 7.46 },
+    { code: 'USD', rate: 1.09 },
+  ]
+
+  const colors = [
+    { backgroundColor: 'rgba(255, 177, 101, 0.4)', borderColor: 'rgba(255, 177, 101, 1)' },
+    { backgroundColor: 'rgba(101, 255, 137, 0.4)', borderColor: 'rgba(101, 255, 137, 1)' },
+    { backgroundColor: 'rgba(101, 157, 255, 0.4)', borderColor: 'rgba(101, 157, 255, 1)' },
+    { backgroundColor: 'rgba(255, 101, 101, 0.4)', borderColor: 'rgba(255, 101, 101, 1)' },
+    { backgroundColor: 'rgba(255, 251, 101, 0.4)', borderColor: 'rgba(255, 251, 101, 1)' },
+    { backgroundColor: 'rgba(137, 101, 255, 0.4)', borderColor: 'rgba(137, 101, 255, 1)' },
+    { backgroundColor: 'rgba(101, 255, 241, 0.4)', borderColor: 'rgba(101, 255, 241, 1)' },
+    { backgroundColor: 'rgba(177, 101, 255, 0.4)', borderColor: 'rgba(177, 101, 255, 1)' },
+    { backgroundColor: 'rgba(255, 101, 221, 0.4)', borderColor: 'rgba(255, 101, 221, 1)' },
+    { backgroundColor: 'rgba(101, 255, 101, 0.4)', borderColor: 'rgba(101, 255, 101, 1)' },
+  ]
+
   let offset = 3
 
-  let data = {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-    datasets: [
-      {
-        label: 'Expected Expenses',
-        data: [12, 19, 3, 5, 2, 3],
-        backgroundColor: 'rgba(255, 177, 101, 0.4)',
-        borderWidth: 2,
-        borderColor: 'rgba(255, 177, 101, 1)',
-      },
-    ],
-  }
-
-  import { read, utils, writeFileXLSX } from 'xlsx'
+  let data: ChartData<"bar", (number | [number, number])[], unknown> = writable({ datasets: [] })
 
   /* the component state is an array of presidents */
   let rows = []
@@ -43,9 +49,7 @@
 
   /* get state data and export to XLSX */
   function exportFile() {
-    const flat = entries.map(entry => flatten(entry))
-    console.log('qwe')
-    console.log(flat)
+    const flat = get(entries).map(entry => flatten(entry))
     const ws = utils.json_to_sheet(flat)
     const wb = utils.book_new()
     utils.book_append_sheet(wb, ws, 'Data')
@@ -64,7 +68,6 @@
     // Unflatten the JSON data if necessary
     const unflattenedData = jsonData.map(entry => unflatten(entry))
 
-    console.log(unflattenedData)
     return unflattenedData
   }
 
@@ -77,7 +80,7 @@
       const ws = wb.Sheets[wb.SheetNames[0]]
       let rows = utils.sheet_to_json(ws)
 
-      entries = rows.map(entry => {
+      let newEntries = rows.map(entry => {
         let unflattenedEntry: Entry = unflatten(entry)
         // Restore prototype for start and end dates
         unflattenedEntry.timeRange.start = new CalendarDate(
@@ -93,7 +96,7 @@
         return unflattenedEntry
       })
 
-      console.log('imported entries:', entries)
+      entries.set(newEntries)
     }
 
     reader.readAsArrayBuffer(file)
@@ -110,8 +113,6 @@
       rows = utils.sheet_to_json(ws).slice(offset)
       headers = rows[0]
       rows = rows.slice(1)
-      console.log(headers)
-      console.log(rows)
 
       // Loop over the array and sum the prices for each month
       monthlySums = {}
@@ -132,12 +133,8 @@
         }
       })
 
-      console.log(monthlySums)
-
       const keys = Object.keys(monthlySums)
       const values = keys.map(key => monthlySums[key])
-      console.log(keys)
-      console.log(values)
       data.datasets.push({
         label: 'Actual Expenses',
         data: values,
@@ -179,115 +176,28 @@
     }
   }
 
-  let entries: Entry[] = [
-    MakeRow(EntryType.Expense, 'Office Rent', 3000, 'Facilities', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Utilities (Electricity, Water, Internet)', 500, 'Facilities', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Adobe Substance 3D License', 50, 'Software', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Autodesk Maya License', 200, 'Software', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Unity Pro Subscription', 150, 'Software', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Unreal Engine Subscription', 100, 'Software', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'GitHub Enterprise', 250, 'Software', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'JIRA Subscription', 100, 'Software', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Slack Premium', 200, 'Software', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Google Workspace', 300, 'Software', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'AWS Cloud Storage', 500, 'Software', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Microsoft Azure Services', 400, 'Software', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Employee Salaries', 50000, 'Payroll', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Freelance Developer Fees', 2000, 'Payroll', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Health Insurance', 3000, 'Benefits', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Office Supplies', 200, 'Office', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Google Ads', 2000, 'Marketing', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Facebook Ads', 1500, 'Marketing', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Travel Expenses for Conferences', 1000, 'Travel', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'GDC Conference Sponsorship', 5000, 'Marketing', EntryInterval.Once),
-    MakeRow(EntryType.Expense, 'Website Hosting', 100, 'Software', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'SSL Certificates', 200, 'Software', EntryInterval.Yearly),
-    MakeRow(EntryType.Expense, 'Customer Support Platform (Zendesk)', 150, 'Services', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Dedicated Server Hosting', 300, 'Software', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Online Course Subscriptions (Coursera, Udemy)', 100, 'Training', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Game Development Kits (Xbox, PlayStation)', 500, 'Hardware', EntryInterval.Yearly),
-    MakeRow(EntryType.Expense, '3D Printer Maintenance', 100, 'Hardware', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Sound Studio Rental', 500, 'Hardware', EntryInterval.Once),
-    MakeRow(EntryType.Expense, 'Office Furniture', 1500, 'Office', EntryInterval.Once),
-    MakeRow(EntryType.Expense, 'Animation Workshop', 1000, 'Training', EntryInterval.Quarterly),
-    MakeRow(EntryType.Expense, 'QA Testing Services', 1500, 'Services', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Freelance Artist Fees', 2000, 'Services', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Legal Fees', 500, 'Legal', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Accounting Software (QuickBooks)', 50, 'Software', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'ESRB Game Rating Fees', 500, 'Regulatory', EntryInterval.Once),
-    MakeRow(EntryType.Expense, 'Adobe Creative Cloud Subscription', 60, 'Software', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Game Audio Middleware (Wwise, FMOD)', 200, 'Software', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'VR Development Kit', 1000, 'Hardware', EntryInterval.Once),
-    MakeRow(EntryType.Expense, 'Bug Tracking Software (Bugzilla)', 100, 'Software', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Animation Software (Toon Boom, Spine)', 100, 'Software', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Game Localization Services', 1000, 'Services', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Motion Capture Suit Rental', 1500, 'Hardware', EntryInterval.Once),
-    MakeRow(EntryType.Expense, 'Graphic Design Services', 1000, 'Services', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Server Maintenance', 200, 'Software', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Mobile Device Testing Services', 300, 'Hardware', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Backup Solutions (Carbonite, Backblaze)', 100, 'Software', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'General Liability Insurance', 500, 'Benefits', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Postage and Shipping', 50, 'Office', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Print Marketing Materials', 200, 'Marketing', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Bank Transaction Fees', 50, 'Financial', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Trademark Registration Fees', 300, 'Regulatory', EntryInterval.Once),
-    MakeRow(EntryType.Expense, 'Employee Recruitment Ads', 500, 'HR', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Subscription to Industry Reports', 100, 'Software', EntryInterval.Monthly),
-    MakeRow(EntryType.Expense, 'Data Analytics Tools (Mixpanel, Google Analytics)', 200, 'Software', EntryInterval.Monthly),
-  ]
+  let entries: Writable<Entry[]> = writable([])
 
-  // Everything is based on the value of the euro
-  let currencies: Currency[] = []
   onMount(async () => {
-    // Does not work. CORS error.
-    //exchangeRates = (await fetchExchangeRates()) || {}
-
-    currencies.push({ code: 'EUR', rate: 1 })
-    currencies.push({ code: 'DKK', rate: 7.46 })
-    currencies.push({ code: 'USD', rate: 1.09 })
-
-    /*const entriesJson = localStorage.getItem('entries')
-    if (entriesJson) {
-      console.log(entriesJson)
-      entries = JSON.parse(entriesJson)
-      console.log(entries)
-      rebuild()
-    }*/
+    // load from local storage
+    let rows = JSON.parse(localStorage.entries)
+    let newEntries = await rows.map(entry => {
+      let unflattenedEntry: Entry = unflatten(entry)
+      // Restore prototype for start and end dates
+      unflattenedEntry.timeRange.start = new CalendarDate(unflattenedEntry.timeRange.start.year, unflattenedEntry.timeRange.start.month, unflattenedEntry.timeRange.start.day)
+      unflattenedEntry.timeRange.end = new CalendarDate( unflattenedEntry.timeRange.end.year, unflattenedEntry.timeRange.end.month, unflattenedEntry.timeRange.end.day)
+      return unflattenedEntry
+    })
+    // entries
+     entries.subscribe(e => { localStorage.entries = JSON.stringify(e) })
+     entries.subscribe(e => { rebuild() })
+    entries.set(newEntries)
   })
 
-  function daysInMonth(month, year) {
-    return new Date(year, month, 0).getDate()
-  }
-
-  let changes: number = 0
-  $: entries, (changes += 1)
-  $: entries, rebuild()
-
-  function deepEqual(x, y) {
-    return JSON.stringify(x) == JSON.stringify(y)
-  }
-
-  const colors = [
-    { backgroundColor: 'rgba(255, 177, 101, 0.4)', borderColor: 'rgba(255, 177, 101, 1)' },
-    { backgroundColor: 'rgba(101, 255, 137, 0.4)', borderColor: 'rgba(101, 255, 137, 1)' },
-    { backgroundColor: 'rgba(101, 157, 255, 0.4)', borderColor: 'rgba(101, 157, 255, 1)' },
-    { backgroundColor: 'rgba(255, 101, 101, 0.4)', borderColor: 'rgba(255, 101, 101, 1)' },
-    { backgroundColor: 'rgba(255, 251, 101, 0.4)', borderColor: 'rgba(255, 251, 101, 1)' },
-    { backgroundColor: 'rgba(137, 101, 255, 0.4)', borderColor: 'rgba(137, 101, 255, 1)' },
-    { backgroundColor: 'rgba(101, 255, 241, 0.4)', borderColor: 'rgba(101, 255, 241, 1)' },
-    { backgroundColor: 'rgba(177, 101, 255, 0.4)', borderColor: 'rgba(177, 101, 255, 1)' },
-    { backgroundColor: 'rgba(255, 101, 221, 0.4)', borderColor: 'rgba(255, 101, 221, 1)' },
-    { backgroundColor: 'rgba(101, 255, 101, 0.4)', borderColor: 'rgba(101, 255, 101, 1)' },
-  ]
-
+  let categoryToggles = []
   function rebuild() {
-    console.log('rebuilding')
-
-    let result = solver.solve(entries)
-    console.log(result.timestamps)
+    let result = solver.solve(get(entries))
     let monthlyResults = solver.accumulateMonthly(result)
-    //console.log(Array.from(result.categories))
-    console.log(monthlyResults)
 
     data.labels = monthlyResults.map(item => item.label)
 
@@ -338,235 +248,240 @@
     data.datasets = datasets
   }
 
-  let categoryToggles = []
-  $: entries, rebuild()
   $: categoryToggles, rebuild()
 </script>
 
-<div class="p-8 bg-neutral-950">
-  <div class="flex justify-center w-full h-96 mb-6">
-    <Bar {data} options={{ responsive: true, maintainAspectRatio: false, animation: { duration: 0 } }} />
-  </div>
-</div>
-
-<div class="flex flex-col p-8 gap-2 bg-neutral-900">
-  <div class="flex flex-row gap-6">
-    <div class="flex flex-row gap-1">
-      <!-- import -->
-      <Button on:click={exportFile} variant="outline" class="p-2"><Download size=18/></Button>
-      <!-- export -->
-      <Input type="file" accept=".xlsx" id="import-entries" class="hidden" on:change={importEntriesFile} />
-      <Button id="import-entries" variant="outline" on:click={() => {document.getElementById("import-entries").click()}} class="p-2"><Upload size=18/></Button>
-      <!-- Clear -->
-      <AlertDialog.Root>
-        <AlertDialog.Trigger asChild let:builder>
-          <Button builders={[builder]} variant="outline" class="p-2"><X size=20/></Button>
-        </AlertDialog.Trigger>
-        <AlertDialog.Content class="bg-neutral-800">
-          <AlertDialog.Header>
-            <AlertDialog.Title class="flex-1 text-center">Are you sure you want to DELETE ALL ENTRIES?</AlertDialog.Title>
-          </AlertDialog.Header>
-          <AlertDialog.Footer class="flex flex-row">
-            <AlertDialog.Cancel class="flex-grow border-0 text-white bg-blue-500 hover:bg-blue-400">No</AlertDialog.Cancel>
-            <AlertDialog.Action class="flex-grow border-0 text-white bg-red-500 hover:bg-red-400" on:click={() => { entries = [] }} >Yes</AlertDialog.Action>
-          </AlertDialog.Footer>
-        </AlertDialog.Content>
-      </AlertDialog.Root>
+<div class="flex flex-col min-h-screen">
+  <div class="p-8 bg-neutral-950">
+    <div class="flex justify-center w-full h-96 mb-6">
+      <Bar {data} options={{ responsive: true, maintainAspectRatio: false, animation: { duration: 0 } }} />
     </div>
-    <div class="flex flex-grow"></div>
-    <div class="flex flex-row flex-wrap gap-2 justify-right my-auto">
-      {#each categoryToggles as categoryToggle}
+  </div>
+
+  <div class="flex flex-col flex-grow p-8 gap-2 bg-neutral-900">
+    <div class="flex flex-row gap-6">
+      <div class="flex flex-row gap-1">
+        <!-- import -->
+        <Button on:click={exportFile} variant="outline" class="p-2"><Download size="18" /></Button>
+        <!-- export -->
+        <Input type="file" accept=".xlsx" id="import-entries" class="hidden" on:change={importEntriesFile} />
         <Button
-          style={`opacity: ${categoryToggle.enabled ? '1.0' : '0.3'};background-color: ${categoryToggle.color.backgroundColor}; color: ${categoryToggle.color.borderColor}; border-color: ${categoryToggle.color.borderColor}`}
-          class="border-2 font-semibold  h-fit p-1.5 py-1"
           on:click={() => {
-            categoryToggle.enabled = !categoryToggle.enabled
+            document.getElementById('import-entries').click()
           }}
-          value={categoryToggle.category}>{categoryToggle.category}</Button
+          id="import-entries"
+          variant="outline"
+          class="p-2"><Upload size="18" /></Button
         >
-      {/each}
-    </div>
-  </div>
-
-  <Table.Root>
-    <Table.Caption>
-      <Button on:click={() => (entries = [...entries, MakeRow()])} variant="outline">Add Row</Button>
-    </Table.Caption>
-    <Table.Header>
-      <Table.Row>
-        <Table.Head class="w-28">Type</Table.Head>
-        <Table.Head>Description</Table.Head>
-        <Table.Head class="w-32">Catagory</Table.Head>
-        <Table.Head class="w-40">Amount</Table.Head>
-        <Table.Head class="w-32">Interval</Table.Head>
-        <Table.Head class="w-40">Calendar Range</Table.Head>
-      </Table.Row>
-    </Table.Header>
-    <Table.Body>
-      {#each entries as entry}
-        <Table.Row>
-          <Table.Cell>
-            <Select.Root selected={{ value: entry.type, label: entry.type }}>
-              <Select.Trigger>
-                <Select.Value placeholder="Select a type" class="capitalize" />
-              </Select.Trigger>
-              <Select.Content>
-                <Select.Group>
-                  {#each Object.values(EntryType) as value}
-                    <Select.Item {value} class="capitalize">{value}</Select.Item>
-                  {/each}
-                </Select.Group>
-              </Select.Content>
-              <Select.Input />
-            </Select.Root>
-          </Table.Cell>
-          <Table.Cell>
-            <Input type="text" placeholder="Hookers and cocaine..." bind:value={entry.description} />
-          </Table.Cell>
-          <Table.Cell>
-            <Select.Root
-              selected={{ value: entry.category, label: entry.category }}
-              onSelectedChange={v => {
-                entry.category = v.value
-                console.log(v)
-              }}
-            >
-              <Select.Trigger>
-                <Select.Value placeholder="Select a category" class="capitalize" />
-              </Select.Trigger>
-              <Select.Content>
-                <Select.Group>
-                  <Select.Item value="miscellaneous" class="capitalize">miscellaneous</Select.Item>
-                  <Select.Item value="payroll" class="capitalize">payroll</Select.Item>
-                  <Select.Item value="utilities" class="capitalize">utilities</Select.Item>
-                  <Select.Item value="insurance" class="capitalize">insurance</Select.Item>
-                  <Select.Item value="taining" class="capitalize">taining</Select.Item>
-                  <Select.Item value="travel" class="capitalize">travel</Select.Item>
-                  <Select.Item value="website" class="capitalize">website</Select.Item>
-                  <Select.Item value="software" class="capitalize">software</Select.Item>
-                  <Select.Item value="hardware" class="capitalize">hardware</Select.Item>
-                  <Select.Item value="office" class="capitalize">office</Select.Item>
-                  <Select.Item value="server" class="capitalize">server</Select.Item>
-                  <Select.Item value="rent" class="capitalize">rent</Select.Item>
-                  <Select.Item value="catering" class="capitalize">catering</Select.Item>
-                </Select.Group>
-              </Select.Content>
-              <Select.Input name="favoriteFruit" />
-            </Select.Root>
-          </Table.Cell>
-          <Table.Cell class="flex flex-row">
-            <Input
-              type="number"
-              class="w-20 rounded-r-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              placeholder="1234.56"
-              value={entry.amount}
-              on:input={e => {
-                e.target.value = Number(e.target.value)
-                entry.amount = Number(e.target.value)
-              }}
-            />
-            <!-- Currency -->
-            <Select.Root
-              selected={{ value: entry.currency, label: entry.currency.code }}
-              onSelectedChange={v => {
-                entry.currency = v.value
-              }}
-            >
-              <Select.Trigger class="rounded-l-none border-l-0">
-                <Select.Value placeholder="DKK" class="capitalize" />
-              </Select.Trigger>
-              <Select.Content>
-                <Select.Group>
-                  {#each currencies as currency}
-                    <Select.Item value={currency} class="uppercase">{currency.code}</Select.Item>
-                  {/each}
-                </Select.Group>
-              </Select.Content>
-              <Select.Input name="favoriteFruit" />
-            </Select.Root>
-          </Table.Cell>
-          <Table.Cell>
-            <Select.Root
-              selected={{ value: entry.interval, label: entry.interval }}
-              onSelectedChange={v => {
-                entry.interval = v.value
-                console.log(v)
-              }}
-            >
-              <Select.Trigger>
-                <Select.Value placeholder="Select an interval" class="capitalize" />
-              </Select.Trigger>
-              <Select.Content>
-                <Select.Group>
-                  {#each Object.values(EntryInterval) as value}
-                    <Select.Item {value} class="capitalize">{value}</Select.Item>
-                  {/each}
-                </Select.Group>
-              </Select.Content>
-              <Select.Input name="favoriteFruit" />
-            </Select.Root>
-          </Table.Cell>
-          <Table.Cell>
-            <DropdownMenu.Root>
-              <DropdownMenu.Trigger asChild let:builder>
-                <Button builders={[builder]} variant="outline">
-                  <CalendarRange size="20" class="mr-2" />
-                  {entry.timeRange.start} / {entry.timeRange.end}
-                </Button>
-              </DropdownMenu.Trigger>
-              <DropdownMenu.Content>
-                <RangeCalendar bind:value={entry.timeRange} class="rounded-md border shadow" />
-              </DropdownMenu.Content>
-            </DropdownMenu.Root>
-          </Table.Cell>
-        </Table.Row>
-      {/each}
-    </Table.Body>
-  </Table.Root>
-
-  <Tabs.Root value="budgeteditor" class="w-full">
-    <Tabs.List>
-      <Tabs.Trigger value="budgeteditor">Budget Editor</Tabs.Trigger>
-      <Tabs.Trigger value="production">Production</Tabs.Trigger>
-    </Tabs.List>
-    <Tabs.Content value="budgeteditor"></Tabs.Content>
-    <Tabs.Content value="production">
-      <div class="flex gap-4">
-        Offset
-        <Input type="number" bind:value={offset} />
-        <Input type="file" accept=".xlsx" on:change={handleFileUpload} />
+        <!-- Clear -->
+        <AlertDialog.Root>
+          <AlertDialog.Trigger asChild let:builder>
+            <Button builders={[builder]} variant="outline" class="p-2"><X size="20" /></Button>
+          </AlertDialog.Trigger>
+          <AlertDialog.Content class="bg-neutral-800">
+            <AlertDialog.Header>
+              <AlertDialog.Title class="flex-1 text-center">Are you sure you want to DELETE ALL ENTRIES?</AlertDialog.Title>
+            </AlertDialog.Header>
+            <AlertDialog.Footer class="flex flex-row">
+              <AlertDialog.Cancel class="flex-grow border-0 text-white bg-blue-500 hover:bg-blue-400">No</AlertDialog.Cancel>
+              <AlertDialog.Action
+                class="flex-grow border-0 text-white bg-red-500 hover:bg-red-400"
+                on:click={() => {
+                  entries.set([])
+                }}>Yes</AlertDialog.Action
+              >
+            </AlertDialog.Footer>
+          </AlertDialog.Content>
+        </AlertDialog.Root>
       </div>
+      <div class="flex flex-grow"></div>
+      <div class="flex flex-row flex-wrap gap-2 justify-right my-auto">
+        {#each categoryToggles as categoryToggle}
+          <Button
+            style={`opacity: ${categoryToggle.enabled ? '1.0' : '0.3'};background-color: ${categoryToggle.color.backgroundColor}; color: ${categoryToggle.color.borderColor}; border-color: ${categoryToggle.color.borderColor}`}
+            class="border-2 font-semibold  h-fit p-1.5 py-1"
+            on:click={() => {
+              categoryToggle.enabled = !categoryToggle.enabled
+            }}
+            value={categoryToggle.category}>{categoryToggle.category}</Button
+          >
+        {/each}
+      </div>
+    </div>
 
-      {#if rows.length || headers.length}
-        <Table.Root>
-          <Table.Caption>
-            <Button>Add Row</Button>
-          </Table.Caption>
-          <Table.Header>
-            <Table.Row>
-              {#each Object.keys(headers) as key}
-                <Table.Head class="w-40">{key}</Table.Head>
-              {/each}
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {#each rows as row}
+    <Table.Root>
+      <Table.Caption>
+        <Button on:click={() => entries.update(e => [...e, MakeRow()])} variant="outline">Add Row</Button>
+      </Table.Caption>
+      <Table.Header>
+        <Table.Row>
+          <Table.Head class="w-28">Type</Table.Head>
+          <Table.Head>Description</Table.Head>
+          <Table.Head class="w-32">Catagory</Table.Head>
+          <Table.Head class="w-40">Amount</Table.Head>
+          <Table.Head class="w-32">Interval</Table.Head>
+          <Table.Head class="w-40">Calendar Range</Table.Head>
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {#each $entries as entry}
+          <Table.Row>
+            <Table.Cell>
+              <Select.Root selected={{ value: entry.type, label: entry.type }}>
+                <Select.Trigger>
+                  <Select.Value placeholder="Select a type" class="capitalize" />
+                </Select.Trigger>
+                <Select.Content>
+                  <Select.Group>
+                    {#each Object.values(EntryType) as value}
+                      <Select.Item {value} class="capitalize">{value}</Select.Item>
+                    {/each}
+                  </Select.Group>
+                </Select.Content>
+                <Select.Input />
+              </Select.Root>
+            </Table.Cell>
+            <Table.Cell>
+              <Input type="text" placeholder="Hookers and cocaine..." bind:value={entry.description} />
+            </Table.Cell>
+            <Table.Cell>
+              <Select.Root
+                selected={{ value: entry.category, label: entry.category }}
+                onSelectedChange={v => { entry.category = v.value }}
+              >
+                <Select.Trigger>
+                  <Select.Value placeholder="Select a category" class="capitalize" />
+                </Select.Trigger>
+                <Select.Content>
+                  <Select.Group>
+                    <Select.Item value="miscellaneous" class="capitalize">miscellaneous</Select.Item>
+                    <Select.Item value="payroll" class="capitalize">payroll</Select.Item>
+                    <Select.Item value="utilities" class="capitalize">utilities</Select.Item>
+                    <Select.Item value="insurance" class="capitalize">insurance</Select.Item>
+                    <Select.Item value="taining" class="capitalize">taining</Select.Item>
+                    <Select.Item value="travel" class="capitalize">travel</Select.Item>
+                    <Select.Item value="website" class="capitalize">website</Select.Item>
+                    <Select.Item value="software" class="capitalize">software</Select.Item>
+                    <Select.Item value="hardware" class="capitalize">hardware</Select.Item>
+                    <Select.Item value="office" class="capitalize">office</Select.Item>
+                    <Select.Item value="server" class="capitalize">server</Select.Item>
+                    <Select.Item value="rent" class="capitalize">rent</Select.Item>
+                    <Select.Item value="catering" class="capitalize">catering</Select.Item>
+                  </Select.Group>
+                </Select.Content>
+                <Select.Input name="favoriteFruit" />
+              </Select.Root>
+            </Table.Cell>
+            <Table.Cell class="flex flex-row">
+              <Input
+                type="number"
+                class="w-20 rounded-r-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                placeholder="1234.56"
+                value={entry.amount}
+                on:input={e => {
+                  e.target.value = Number(e.target.value)
+                  entry.amount = Number(e.target.value)
+                }}
+              />
+              <!-- Currency -->
+              <Select.Root
+                selected={{ value: entry.currency, label: entry.currency.code }}
+                onSelectedChange={v => {
+                  entry.currency = v.value
+                }}
+              >
+                <Select.Trigger class="rounded-l-none border-l-0">
+                  <Select.Value placeholder="DKK" class="capitalize" />
+                </Select.Trigger>
+                <Select.Content>
+                  <Select.Group>
+                    {#each currencies as currency}
+                      <Select.Item value={currency} class="uppercase">{currency.code}</Select.Item>
+                    {/each}
+                  </Select.Group>
+                </Select.Content>
+                <Select.Input name="favoriteFruit" />
+              </Select.Root>
+            </Table.Cell>
+            <Table.Cell>
+              <Select.Root
+                selected={{ value: entry.interval, label: entry.interval }}
+                onSelectedChange={v => { entry.interval = v.value }}>
+                <Select.Trigger>
+                  <Select.Value placeholder="Select an interval" class="capitalize" />
+                </Select.Trigger>
+                <Select.Content>
+                  <Select.Group>
+                    {#each Object.values(EntryInterval) as value}
+                      <Select.Item {value} class="capitalize">{value}</Select.Item>
+                    {/each}
+                  </Select.Group>
+                </Select.Content>
+                <Select.Input name="favoriteFruit" />
+              </Select.Root>
+            </Table.Cell>
+            <Table.Cell>
+              <DropdownMenu.Root>
+                <DropdownMenu.Trigger asChild let:builder>
+                  <Button builders={[builder]} variant="outline">
+                    <CalendarRange size="20" class="mr-2" />
+                    {entry.timeRange.start} / {entry.timeRange.end}
+                  </Button>
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Content>
+                  <RangeCalendar bind:value={entry.timeRange} class="rounded-md border shadow" />
+                </DropdownMenu.Content>
+              </DropdownMenu.Root>
+            </Table.Cell>
+          </Table.Row>
+        {/each}
+      </Table.Body>
+    </Table.Root>
+
+    <Tabs.Root value="budgeteditor" class="w-full">
+      <Tabs.List>
+        <Tabs.Trigger value="budgeteditor">Budget Editor</Tabs.Trigger>
+        <Tabs.Trigger value="production">Production</Tabs.Trigger>
+      </Tabs.List>
+      <Tabs.Content value="budgeteditor"></Tabs.Content>
+      <Tabs.Content value="production">
+        <div class="flex gap-4">
+          Offset
+          <Input type="number" bind:value={offset} />
+          <Input type="file" accept=".xlsx" on:change={handleFileUpload} />
+        </div>
+
+        {#if rows.length || headers.length}
+          <Table.Root>
+            <Table.Caption>
+              <Button>Add Row</Button>
+            </Table.Caption>
+            <Table.Header>
               <Table.Row>
-                {#each Object.keys(row) as key}
-                  <Table.Cell>{row[key]}</Table.Cell>
+                {#each Object.keys(headers) as key}
+                  <Table.Head class="w-40">{key}</Table.Head>
                 {/each}
               </Table.Row>
-            {/each}
-          </Table.Body>
-        </Table.Root>
-      {/if}
-    </Tabs.Content>
-  </Tabs.Root>
+            </Table.Header>
+            <Table.Body>
+              {#each rows as row}
+                <Table.Row>
+                  {#each Object.keys(row) as key}
+                    <Table.Cell>{row[key]}</Table.Cell>
+                  {/each}
+                </Table.Row>
+              {/each}
+            </Table.Body>
+          </Table.Root>
+        {/if}
+      </Tabs.Content>
+    </Tabs.Root>
 
-  <Alert.Root class="text-orange-400">
-    <Alert.Description>
-      <TriangleAlert class="h-4 w-4 inline mr-1" />
-      Missing features: saving, working category colors (also on select)
-    </Alert.Description>
-  </Alert.Root>
+    <Alert.Root class="text-orange-400">
+      <Alert.Description>
+        <TriangleAlert class="h-4 w-4 inline mr-1" />
+        Missing features: saving, working category colors (also on select)
+      </Alert.Description>
+    </Alert.Root>
+  </div>
 </div>
