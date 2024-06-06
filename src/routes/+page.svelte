@@ -12,10 +12,9 @@
   import { today, getLocalTimeZone, startOfYear, endOfYear } from '@internationalized/date'
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
   import { CalendarRange, TriangleAlert } from 'lucide-svelte'
-  import solver, { EntryInterval, EntryType, type Entry, type Result as SolverResult } from '$lib/solver'
+  import solver, { EntryInterval, EntryType, type Entry, type Result as SolverResult, type Currency } from '$lib/solver'
   import { writable } from 'svelte/store'
   import * as Alert from '$lib/components/ui/alert'
-  import { fetchExchangeRates, type ExchangeRates } from '$lib/services/exchangeRates'
 
   Chart.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale)
 
@@ -115,11 +114,13 @@
     amount: number = 0,
     category: string = 'miscellaneous',
     interval: EntryInterval = EntryInterval.Monthly,
+    currency: Currency = { code: 'EUR', rate: 1 },
   ) => {
     return {
       type: type,
       description: description,
       amount: amount,
+      currency: currency,
       interval: interval,
       category: category,
       timeRange: { start: startOfYear(today(getLocalTimeZone())), end: endOfYear(today(getLocalTimeZone())) },
@@ -184,14 +185,14 @@
   ]
 
   // Everything is based on the value of the euro
-  let exchangeRates: ExchangeRates = {}
+  let currencies: Currency[] = []
   onMount(async () => {
     // Does not work. CORS error.
     //exchangeRates = (await fetchExchangeRates()) || {}
 
-    exchangeRates["EUR"] = 1
-    exchangeRates["DKK"] = 7.46
-    exchangeRates["USD"] = 1.09 
+    currencies.push({ code: 'EUR', rate: 1 })
+    currencies.push({ code: 'DKK', rate: 7.46 })
+    currencies.push({ code: 'USD', rate: 1.09 })
 
     /*const entriesJson = localStorage.getItem('entries')
     if (entriesJson) {
@@ -231,8 +232,10 @@
     console.log('rebuilding')
 
     let result = solver.solve(entries)
+    console.log(result.timestamps)
     let monthlyResults = solver.accumulateMonthly(result)
     //console.log(Array.from(result.categories))
+    console.log(monthlyResults)
 
     data.labels = monthlyResults.map(item => item.label)
 
@@ -395,14 +398,20 @@
                 entry.amount = Number(e.target.value)
               }}
             />
-            <Select.Root selected={{ value: 'DKK', label: 'DKK' }}>
+            <!-- Currency -->
+            <Select.Root
+              selected={{ value: entry.currency, label: entry.currency.code }}
+              onSelectedChange={v => {
+                entry.currency = v.value
+              }}
+            >
               <Select.Trigger class="rounded-l-none border-l-0">
                 <Select.Value placeholder="DKK" class="capitalize" />
               </Select.Trigger>
               <Select.Content>
                 <Select.Group>
-                  {#each Object.keys(exchangeRates) as currency}
-                    <Select.Item value={currency} class="uppercase">{currency}</Select.Item>
+                  {#each currencies as currency}
+                    <Select.Item value={currency} class="uppercase">{currency.code}</Select.Item>
                   {/each}
                 </Select.Group>
               </Select.Content>
