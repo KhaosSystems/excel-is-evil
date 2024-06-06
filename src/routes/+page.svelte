@@ -261,7 +261,7 @@
       if (categoryToggles.find(e => e.category == categoryName).enabled) {
         datasets.push({
           label: categoryName,
-          data: monthlyBalance,F
+          data: monthlyBalance,
           backgroundColor: colors[datasets.length % colors.length].backgroundColor,
           borderWidth: 2,
           borderColor: colors[datasets.length % colors.length].borderColor,
@@ -281,11 +281,13 @@
   $: categoryToggles, rebuild()
 </script>
 
-<div class="flex flex-col p-8 gap-2">
+<div class="p-8 bg-neutral-950">
   <div class="flex justify-center w-full h-96 mb-6">
     <Bar {data} options={{ responsive: true, maintainAspectRatio: false, animation: { duration: 0 } }} />
   </div>
+</div>
 
+<div class="flex flex-col p-8 gap-2 bg-neutral-900">
   <Alert.Root class="text-orange-400">
     <Alert.Description>
       <TriangleAlert class="h-4 w-4 inline mr-1" />
