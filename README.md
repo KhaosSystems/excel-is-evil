@@ -1,3 +1,9 @@
+# deploy to pages
+
+deployed on github pages: to update ` npm run deploy`
+
+can be used as desktop app using tauri: `npm run tauri dev` `npm run tauri build`
+
 # create-svelte
 
 Everything you need to build a Svelte project, powered by [`create-svelte`](https://github.com/sveltejs/kit/tree/main/packages/create-svelte).

@@ -9,10 +9,10 @@
   import { Input } from '$lib/components/ui/input'
   import { Chart, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale } from 'chart.js'
   import { RangeCalendar } from '$lib/components/ui/range-calendar'
-  import { today, getLocalTimeZone, startOfYear, endOfYear } from '@internationalized/date'
+  import { today, getLocalTimeZone, startOfYear, endOfYear, CalendarDate } from '@internationalized/date'
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
   import { CalendarRange, TriangleAlert } from 'lucide-svelte'
-  import solver, { EntryInterval, EntryType, type Entry, type Result as SolverResult, type Currency } from '$lib/solver'
+  import solver, { EntryInterval, EntryType, type Entry, type Result as SolverResult, type EntryTimeRange, type Currency } from '$lib/solver'
   import { writable } from 'svelte/store'
   import * as Alert from '$lib/components/ui/alert'
   import { flatten, unflatten } from 'flat'
@@ -50,6 +50,7 @@
     utils.book_append_sheet(wb, ws, 'Data')
     writeFileXLSX(wb, 'Export.xlsx')
   }
+
   function importFile(filePath) {
     // Read the Excel file
     const workbook = xlsx.readFile(filePath)
@@ -73,12 +74,25 @@
       const arrayBuffer = e.target.result
       const wb = read(arrayBuffer)
       const ws = wb.Sheets[wb.SheetNames[0]]
-      let rows = utils.sheet_to_json(ws).slice(1)
+      let rows = utils.sheet_to_json(ws)
 
-      // Unflatten the rows if necessary
-      entries = rows.map(entry => unflatten(entry))
+      entries = rows.map(entry => {
+        let unflattenedEntry: Entry = unflatten(entry)
+        // Restore prototype for start and end dates
+        unflattenedEntry.timeRange.start = new CalendarDate(
+          unflattenedEntry.timeRange.start.year,
+          unflattenedEntry.timeRange.start.month,
+          unflattenedEntry.timeRange.start.day,
+        )
+        unflattenedEntry.timeRange.end = new CalendarDate(
+          unflattenedEntry.timeRange.end.year,
+          unflattenedEntry.timeRange.end.month,
+          unflattenedEntry.timeRange.end.day,
+        )
+        return unflattenedEntry
+      })
 
-      console.log('imported entries:', rows)
+      console.log('imported entries:', entries)
     }
 
     reader.readAsArrayBuffer(file)
