@@ -11,7 +11,7 @@
   import { RangeCalendar } from '$lib/components/ui/range-calendar'
   import { today, getLocalTimeZone, startOfYear, endOfYear, CalendarDate } from '@internationalized/date'
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
-  import { CalendarRange, TriangleAlert } from 'lucide-svelte'
+  import { CalendarRange, TriangleAlert, Upload, Download, X } from 'lucide-svelte'
   import solver, { EntryInterval, EntryType, type Entry, type Result as SolverResult, type EntryTimeRange, type Currency } from '$lib/solver'
   import { writable } from 'svelte/store'
   import * as Alert from '$lib/components/ui/alert'
@@ -338,7 +338,6 @@
   }
 
   let categoryToggles = []
-
   $: entries, rebuild()
   $: categoryToggles, rebuild()
 </script>
@@ -349,26 +348,30 @@
   </div>
 </div>
 
-<Button on:click={exportFile}>Export</Button>
-<Button
-  on:click={() => {
-    entries = []
-  }}>Clear</Button
->
-<Input type="file" accept=".xlsx" on:change={importEntriesFile} />
-
 <div class="flex flex-col p-8 gap-2 bg-neutral-900">
-  <div class="flex flex-row flex-wrap gap-2 justify-center">
-    {#each categoryToggles as categoryToggle}
-      <Button
-        style={`opacity: ${categoryToggle.enabled ? '1.0' : '0.3'};background-color: ${categoryToggle.color.backgroundColor}; color: ${categoryToggle.color.borderColor}; border-color: ${categoryToggle.color.borderColor}`}
-        class="border-2 font-semibold"
-        on:click={() => {
-          categoryToggle.enabled = !categoryToggle.enabled
-        }}
-        value={categoryToggle.category}>{categoryToggle.category}</Button
-      >
-    {/each}
+  <div class="flex flex-row gap-6">
+    <div class="flex flex-row gap-1">
+      <!-- import -->
+      <Button on:click={exportFile} variant="outline" class="p-2"><Download size=18/></Button>
+      <!-- export -->
+      <Input type="file" accept=".xlsx" id="import-entries" class="hidden" on:change={importEntriesFile} />
+      <Button id="import-entries" variant="outline" on:click={() => {document.getElementById("import-entries").click()}} class="p-2"><Upload size=18/></Button>
+      <!-- Clear -->
+      <Button variant="outline" on:click={() => { entries = [] }} class="p-2"><X size=20/></Button>
+    </div>
+    <div class="flex flex-grow"></div>
+    <div class="flex flex-row flex-wrap gap-2 justify-right my-auto">
+      {#each categoryToggles as categoryToggle}
+        <Button
+          style={`opacity: ${categoryToggle.enabled ? '1.0' : '0.3'};background-color: ${categoryToggle.color.backgroundColor}; color: ${categoryToggle.color.borderColor}; border-color: ${categoryToggle.color.borderColor}`}
+          class="border-2 font-semibold  h-fit p-1.5 py-1"
+          on:click={() => {
+            categoryToggle.enabled = !categoryToggle.enabled
+          }}
+          value={categoryToggle.category}>{categoryToggle.category}</Button
+        >
+      {/each}
+    </div>
   </div>
 
   <Table.Root>
