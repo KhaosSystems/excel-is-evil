@@ -15,6 +15,7 @@
   import solver, { EntryInterval, EntryType, type Entry, type Result as SolverResult, type Currency } from '$lib/solver'
   import { writable } from 'svelte/store'
   import * as Alert from '$lib/components/ui/alert'
+  import { flatten, unflatten } from 'flat'
 
   Chart.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale)
 
@@ -41,10 +42,46 @@
 
   /* get state data and export to XLSX */
   function exportFile() {
-    const ws = utils.json_to_sheet(pres)
+    const flat = entries.map(entry => flatten(entry))
+    console.log('qwe')
+    console.log(flat)
+    const ws = utils.json_to_sheet(flat)
     const wb = utils.book_new()
     utils.book_append_sheet(wb, ws, 'Data')
-    writeFileXLSX(wb, 'SheetJSSvelteAoO.xlsx')
+    writeFileXLSX(wb, 'Export.xlsx')
+  }
+  function importFile(filePath) {
+    // Read the Excel file
+    const workbook = xlsx.readFile(filePath)
+    const sheetName = workbook.SheetNames[0]
+    const sheet = workbook.Sheets[sheetName]
+
+    // Convert sheet data to JSON
+    const jsonData = xlsx.utils.sheet_to_json(sheet)
+
+    // Unflatten the JSON data if necessary
+    const unflattenedData = jsonData.map(entry => unflatten(entry))
+
+    console.log(unflattenedData)
+    return unflattenedData
+  }
+
+  function importEntriesFile(event) {
+    const file = event.target.files[0]
+    const reader = new FileReader()
+    reader.onload = e => {
+      const arrayBuffer = e.target.result
+      const wb = read(arrayBuffer)
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      let rows = utils.sheet_to_json(ws).slice(1)
+
+      // Unflatten the rows if necessary
+      entries = rows.map(entry => unflatten(entry))
+
+      console.log('imported entries:', rows)
+    }
+
+    reader.readAsArrayBuffer(file)
   }
 
   /* handle file upload and read XLSX */
@@ -284,8 +321,6 @@
     })
 
     data.datasets = datasets
-
-    console.log(data)
   }
 
   let categoryToggles = []
@@ -300,14 +335,15 @@
   </div>
 </div>
 
-<div class="flex flex-col p-8 gap-2 bg-neutral-900">
-  <Alert.Root class="text-orange-400">
-    <Alert.Description>
-      <TriangleAlert class="h-4 w-4 inline mr-1" />
-      The currency fields are currently not implemented. Saving is also missing, and category toggles.
-    </Alert.Description>
-  </Alert.Root>
+<Button on:click={exportFile}>Export</Button>
+<Button
+  on:click={() => {
+    entries = []
+  }}>Clear</Button
+>
+<Input type="file" accept=".xlsx" on:change={importEntriesFile} />
 
+<div class="flex flex-col p-8 gap-2 bg-neutral-900">
   <div class="flex flex-row flex-wrap gap-2 justify-center">
     {#each categoryToggles as categoryToggle}
       <Button
@@ -327,11 +363,11 @@
     </Table.Caption>
     <Table.Header>
       <Table.Row>
-        <Table.Head class="w-40">Type</Table.Head>
+        <Table.Head class="w-28">Type</Table.Head>
         <Table.Head>Description</Table.Head>
-        <Table.Head class="w-48">Catagory</Table.Head>
+        <Table.Head class="w-32">Catagory</Table.Head>
         <Table.Head class="w-40">Amount</Table.Head>
-        <Table.Head class="w-40">Interval</Table.Head>
+        <Table.Head class="w-32">Interval</Table.Head>
         <Table.Head class="w-40">Calendar Range</Table.Head>
       </Table.Row>
     </Table.Header>
@@ -390,7 +426,7 @@
           <Table.Cell class="flex flex-row">
             <Input
               type="number"
-              class="w-24 rounded-r-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              class="w-20 rounded-r-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               placeholder="1234.56"
               value={entry.amount}
               on:input={e => {
@@ -495,4 +531,11 @@
       {/if}
     </Tabs.Content>
   </Tabs.Root>
+
+  <Alert.Root class="text-orange-400">
+    <Alert.Description>
+      <TriangleAlert class="h-4 w-4 inline mr-1" />
+      Missing features: saving, working category colors (also on select)
+    </Alert.Description>
+  </Alert.Root>
 </div>
