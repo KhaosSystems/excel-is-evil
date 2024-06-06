@@ -6,6 +6,7 @@
   import * as Table from '$lib/components/ui/table'
   import * as Select from '$lib/components/ui/select'
   import * as ToggleGroup from '$lib/components/ui/toggle-group'
+  import * as AlertDialog from "$lib/components/ui/alert-dialog";
   import { Input } from '$lib/components/ui/input'
   import { Chart, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale } from 'chart.js'
   import { RangeCalendar } from '$lib/components/ui/range-calendar'
@@ -357,7 +358,20 @@
       <Input type="file" accept=".xlsx" id="import-entries" class="hidden" on:change={importEntriesFile} />
       <Button id="import-entries" variant="outline" on:click={() => {document.getElementById("import-entries").click()}} class="p-2"><Upload size=18/></Button>
       <!-- Clear -->
-      <Button variant="outline" on:click={() => { entries = [] }} class="p-2"><X size=20/></Button>
+      <AlertDialog.Root>
+        <AlertDialog.Trigger asChild let:builder>
+          <Button builders={[builder]} variant="outline" class="p-2"><X size=20/></Button>
+        </AlertDialog.Trigger>
+        <AlertDialog.Content class="bg-neutral-800">
+          <AlertDialog.Header>
+            <AlertDialog.Title class="flex-1 text-center">Are you sure you want to DELETE ALL ENTRIES?</AlertDialog.Title>
+          </AlertDialog.Header>
+          <AlertDialog.Footer class="flex flex-row">
+            <AlertDialog.Cancel class="flex-grow border-0 text-white bg-blue-500 hover:bg-blue-400">No</AlertDialog.Cancel>
+            <AlertDialog.Action class="flex-grow border-0 text-white bg-red-500 hover:bg-red-400" on:click={() => { entries = [] }} >Yes</AlertDialog.Action>
+          </AlertDialog.Footer>
+        </AlertDialog.Content>
+      </AlertDialog.Root>
     </div>
     <div class="flex flex-grow"></div>
     <div class="flex flex-row flex-wrap gap-2 justify-right my-auto">
