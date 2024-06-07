@@ -45,6 +45,7 @@
 
   let settings = writable({
     defaultCurrency: currencies[0],
+    graphCurrency: currencies[0],
 
     // Settings for importing general ledger from your accounting software using an excel file.
     generalLedgerImportCurrency: currencies[0],
@@ -157,9 +158,6 @@
     return new Date(excelEpoch.getTime() + excelDate * 24 * 60 * 60 * 1000)
   }
 
-  // Initialize an empty object to store the sums for each month
-  let monthlySums = {}
-
   const MakeRow = (type: EntryType = EntryType.Expense, description: string = 'description', amount: number = 0, category: string = 'miscellaneous', interval: EntryInterval = EntryInterval.Monthly) => {
     return {
       type: type,
@@ -173,9 +171,7 @@
   }
 
   let entries: Writable<Entry[]> = writable([])
-  let statistics: Writable<Statistics> = writable({
-    total: 0,
-  })
+  let statistics: Writable<Statistics> = writable({})
 
   onMount(async () => {
     // load from local storage
@@ -197,6 +193,7 @@
     const storedSettings = localStorage.settings ? JSON.parse(localStorage.settings) : $settings
     settings.subscribe(s => { localStorage.settings = JSON.stringify(s) })
     settings.subscribe(s => processImportedEntriesSheet())
+    settings.subscribe(s => rebuild())
     settings.set(storedSettings)
   })
 
@@ -205,6 +202,9 @@
     let result = solver.solve(get(entries), {
       excludedCategories: categoryToggles.reduce((categories, toggle) => (toggle.enabled ? categories : [...categories, toggle.category]), []),
     })
+
+    // Convert to graphCurrency from settings
+    result.timestamps.forEach(value => value.amount *= $settings.graphCurrency.rate)
 
     // calculate statistics
     statistics.set(solver.calculateStatistics(result))
@@ -350,14 +350,14 @@
           scales: {
             y: {
               ticks: {
-                callback: (value, index, ticks) => `${value} EUR`,
+                callback: (value, index, ticks) => `${value} ${$settings.graphCurrency.code}`,
               },
             },
           },
           plugins: {
             tooltip: {
               callbacks: {
-                label: item => `${item.dataset.label}: ${item.formattedValue} EUR`,
+                label: item => `${item.dataset.label}: ${item.formattedValue} ${$settings.graphCurrency.code}`,
               },
             },
           },
@@ -368,15 +368,15 @@
       <div class="flex flex-col gap-2 px-6 py-2">
         <div>
           <div class="opacity-50">Statistics</div>
-          <div class="opacity-75 font-semibold">Total: {$statistics.total} EUR</div>
+          <div class="opacity-75 font-semibold">Total: {$statistics.total.toFixed(2)} {$settings.graphCurrency.code}</div>
         </div>
 
         <div>
           <div class="opacity-50">Statistics / Averages</div>
-          <div class="opacity-75 font-semibold">Daily: {$statistics.dailyAverage.toFixed(2)} EUR</div>
-          <div class="opacity-75 font-semibold">Weekly: {$statistics.weeklyAverage.toFixed(2)} EUR</div>
-          <div class="opacity-75 font-semibold">Monthly: {$statistics.monthlyAverage.toFixed(2)} EUR</div>
-          <div class="opacity-75 font-semibold">Quarterly: {$statistics.quarterlyAverage.toFixed(2)} EUR</div>
+          <div class="opacity-75 font-semibold">Daily: {$statistics.dailyAverage.toFixed(2)} {$settings.graphCurrency.code}</div>
+          <div class="opacity-75 font-semibold">Weekly: {$statistics.weeklyAverage.toFixed(2)} {$settings.graphCurrency.code}</div>
+          <div class="opacity-75 font-semibold">Monthly: {$statistics.monthlyAverage.toFixed(2)} {$settings.graphCurrency.code}</div>
+          <div class="opacity-75 font-semibold">Quarterly: {$statistics.quarterlyAverage.toFixed(2)} {$settings.graphCurrency.code}</div>
         </div>
 
         <div>
@@ -460,6 +460,29 @@
                 }}
               >
                 <Select.Trigger id="default-currency">
+                  <Select.Value placeholder="DKK" class="capitalize" />
+                </Select.Trigger>
+                <Select.Content>
+                  <Select.Group>
+                    {#each currencies as currency}
+                      <Select.Item value={currency} class="uppercase">{currency.code}</Select.Item>
+                    {/each}
+                  </Select.Group>
+                </Select.Content>
+                <Select.Input name="favoriteFruit" />
+              </Select.Root>
+              <!---->
+              <Label for="graph-currency">Graph Currency</Label>
+              <Select.Root
+                selected={{ value: $settings.graphCurrency, label: $settings.graphCurrency.code }}
+                onSelectedChange={v => {
+                  settings.update(s => {
+                    s.graphCurrency = v.value
+                    return s
+                  })
+                }}
+              >
+                <Select.Trigger id="graph-currency">
                   <Select.Value placeholder="DKK" class="capitalize" />
                 </Select.Trigger>
                 <Select.Content>
@@ -642,7 +665,7 @@
     <Alert.Root class="text-orange-400">
       <Alert.Description>
         <TriangleAlert class="h-4 w-4 inline mr-1" />
-        Missing features: better import, timeline, graph currency, cash flow, dark/light mode, day/month intervals on bar chart
+        Missing features: timeline, graph currency, cash flow, dark/light mode, day/month intervals on bar chart
       </Alert.Description>
     </Alert.Root>
   </div>
