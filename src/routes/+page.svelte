@@ -5,24 +5,26 @@
   import * as AlertDialog from '$lib/components/ui/alert-dialog'
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
   import * as Alert from '$lib/components/ui/alert'
+  import * as Dialog from '$lib/components/ui/dialog'
   import { onMount } from 'svelte'
   import { Bar } from 'svelte-chartjs'
-  import { Button } from '$lib/components/ui/button'
+  import { Button, buttonVariants } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
   import { Chart, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, type ChartData } from 'chart.js'
   import { RangeCalendar } from '$lib/components/ui/range-calendar'
   import { today, getLocalTimeZone, startOfYear, endOfYear, CalendarDate } from '@internationalized/date'
-  import { CalendarRange, TriangleAlert, Upload, Download, X, Plus } from 'lucide-svelte'
+  import { CalendarRange, TriangleAlert, Upload, Download, X, Plus, Settings } from 'lucide-svelte'
   import solver, { EntryInterval, EntryType, type Entry, type Result as SolverResult, type EntryTimeRange, type Currency } from '$lib/solver'
   import { get, writable, type Writable } from 'svelte/store'
   import { flatten, unflatten } from 'flat'
+  import { Label } from '$lib/components/ui/label'
   import { read, utils, writeFileXLSX } from 'xlsx'
   import { Cell } from '$lib/components/ui/calendar'
   import Calendar from '$lib/components/ui/calendar/calendar.svelte'
 
   Chart.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale)
 
-  let currencies: Currency[] = [
+  const currencies: Currency[] = [
     { code: 'EUR', rate: 1 },
     { code: 'DKK', rate: 7.46 },
     { code: 'USD', rate: 1.09 },
@@ -40,6 +42,10 @@
     { backgroundColor: 'rgba(255, 101, 221, 0.4)', borderColor: 'rgba(255, 101, 221, 1)' },
     { backgroundColor: 'rgba(101, 255, 101, 0.4)', borderColor: 'rgba(101, 255, 101, 1)' },
   ]
+
+  let settings = writable({
+    defaultCurrency: currencies[0],
+  })
 
   let offset = 3
 
@@ -155,13 +161,12 @@
     amount: number = 0,
     category: string = 'miscellaneous',
     interval: EntryInterval = EntryInterval.Monthly,
-    currency: Currency = { code: 'EUR', rate: 1 },
   ) => {
     return {
       type: type,
       description: description,
       amount: amount,
-      currency: currency,
+      currency: get(settings).defaultCurrency,
       interval: interval,
       category: category,
       timeRange: { start: startOfYear(today(getLocalTimeZone())), end: endOfYear(today(getLocalTimeZone())) },
@@ -197,6 +202,14 @@
       rebuild()
     })
     entries.set(newEntries)
+
+    // settings local storage
+    if (localStorage.settings) {
+      localStorage.settings = JSON.parse(localStorage.settings)
+    }
+    settings.subscribe(s => {
+      localStorage.settings = JSON.stringify(s)
+    })
   })
 
   let categoryToggles = []
@@ -305,6 +318,43 @@
             </AlertDialog.Footer>
           </AlertDialog.Content>
         </AlertDialog.Root>
+        <!-- settings -->
+        <Dialog.Root>
+          <Dialog.Trigger class={`${buttonVariants({ variant: 'outline' })} !p-2`}><Settings size="18" /></Dialog.Trigger>
+          <Dialog.Content class="sm:max-w-[425px] bg-neutral-900">
+            <Dialog.Header>
+              <Dialog.Title>Settings</Dialog.Title>
+            </Dialog.Header>
+            <div class="grid w-full max-w-sm items-center gap-1.5">
+              <Label for="default-currency">Default Currency</Label>
+              <Select.Root
+                selected={{ value: $settings.defaultCurrency, label: $settings.defaultCurrency.code }}
+                onSelectedChange={v => {
+                  settings.update(s => {
+                    s.defaultCurrency = v.value
+                    return s
+                  })
+                }}
+              >
+                <Select.Trigger id="default-currency">
+                  <Select.Value placeholder="DKK" class="capitalize" />
+                </Select.Trigger>
+                <Select.Content>
+                  <Select.Group>
+                    {#each currencies as currency}
+                      <Select.Item value={currency} class="uppercase">{currency.code}</Select.Item>
+                    {/each}
+                  </Select.Group>
+                </Select.Content>
+                <Select.Input name="favoriteFruit" />
+              </Select.Root>
+            </div>
+
+            <Dialog.Footer>
+              <Dialog.Close class={`${buttonVariants({ variant: 'default', size: 'default' })}`}>Close</Dialog.Close>
+            </Dialog.Footer>
+          </Dialog.Content>
+        </Dialog.Root>
       </div>
       <div class="flex flex-grow"></div>
       <div class="flex flex-row flex-wrap gap-2 justify-right my-auto">
@@ -365,7 +415,7 @@
               </Select.Root>
             </Table.Cell>
             <Table.Cell>
-              <Input type="text" placeholder="Hookers and cocaine..." bind:value={entry.description} />
+              <Input type="text" placeholder="Description..." bind:value={entry.description} />
             </Table.Cell>
             <Table.Cell>
               <Select.Root
