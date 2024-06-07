@@ -276,7 +276,28 @@
 <div class="flex flex-col min-h-screen">
   <div class="p-8 bg-neutral-950">
     <div class="flex justify-center w-full h-96 mb-6">
-      <Bar {data} options={{ responsive: true, maintainAspectRatio: false, animation: { duration: 0 } }} />
+      <Bar
+        {data}
+        options={{
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 0 },
+          scales: {
+            y: {
+              ticks: {
+                callback: (value, index, ticks) => `${value} EUR`,
+              },
+            },
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: item => `${item.dataset.label}: ${item.formattedValue} EUR`,
+              },
+            },
+          },
+        }}
+      />
     </div>
   </div>
 

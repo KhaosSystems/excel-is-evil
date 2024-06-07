@@ -116,6 +116,11 @@ export type MonthlyResult = {
 }
 
 export function accumulateMonthly(result: Result): MonthlyResult[] {
+  // Helper function to generate a label for a given date
+  const generateLabel = (year: number, month: number): string => {
+    return `${new Date(year, month - 1, 1).toLocaleString('default', { month: 'short' })} ${year}`
+  }
+
   const monthlyResults: MonthlyResult[] = []
 
   result.timestamps.forEach(entry => {
@@ -123,7 +128,7 @@ export function accumulateMonthly(result: Result): MonthlyResult[] {
       const month = entry.timestamp.month
       const year = entry.timestamp.year
       const date = new CalendarDate(year, month, 0)
-      const label = `${new Date(0, month, 0).toLocaleString('default', { month: 'short' })} ${year}`
+      const label = generateLabel(year, month)
 
       let monthlyResult = monthlyResults.find(e => e.date.toString() == date.toString())
       if (!monthlyResult) {
@@ -143,7 +148,34 @@ export function accumulateMonthly(result: Result): MonthlyResult[] {
     }
   })
 
-  return monthlyResults
+  // Sort months
+  monthlyResults.sort((a, b) => {
+    return a.date.compare(b.date)
+  })
+
+  // Insert empty results for missing months
+  const filledMonthlyResults: MonthlyResult[] = []
+
+  if (monthlyResults.length > 0) {
+    let currentDate = monthlyResults[0].date
+    let endDate = monthlyResults[monthlyResults.length - 1].date
+
+    while (currentDate.compare(endDate) <= 0) {
+      let currentMonthResult = monthlyResults.find(e => e.date.toString() == currentDate.toString())
+      if (currentMonthResult) {
+        filledMonthlyResults.push(currentMonthResult)
+      } else {
+        filledMonthlyResults.push({
+          date: new CalendarDate(currentDate.year, currentDate.month, 0),
+          label: generateLabel(currentDate.year, currentDate.month),
+          categorizedResults: [],
+        })
+      }
+      currentDate = currentDate.add({ months: 1 })
+    }
+  }
+
+  return filledMonthlyResults
 }
 
 export default {
