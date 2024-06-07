@@ -47,6 +47,7 @@
     defaultCurrency: currencies[0],
 
     // Settings for importing general ledger from your accounting software using an excel file.
+    generalLedgerImportCurrency: currencies[0],
     generalLedgerImportOffset: 0,
     generalLedgerImportDateRowIndex: 0,
     generalLedgerImportPriceRowIndex: 0,
@@ -137,7 +138,7 @@
 
           importedResult.timestamps.push({
             timestamp: new CalendarDate(jsDate.getFullYear(), jsDate.getMonth(), jsDate.getDate()),
-            amount: price / 7.46, // In EUR
+            amount: price / $settings.generalLedgerImportCurrency.rate, // In EUR
             category: '_imported_',
           })
         } catch (error) {
@@ -276,7 +277,13 @@
     <div class="grid w-full items-center gap-1.5">
       <!-- currency -->
       <Label for="default-currency">Default Currency</Label>
-      <Select.Root selected={{ value: $settings.defaultCurrency, label: $settings.defaultCurrency.code }}>
+      <Select.Root selected={{ value: $settings.generalLedgerImportCurrency, label: $settings.generalLedgerImportCurrency.code }}
+      onSelectedChange={v => {
+        settings.update(s => {
+          s.generalLedgerImportCurrency = v.value
+          return s
+        })
+      }}>
         <Select.Trigger id="default-currency">
           <Select.Value placeholder="DKK" class="capitalize" />
         </Select.Trigger>
