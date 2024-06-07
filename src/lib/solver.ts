@@ -119,23 +119,27 @@ export function accumulateMonthly(result: Result): MonthlyResult[] {
   const monthlyResults: MonthlyResult[] = []
 
   result.timestamps.forEach(entry => {
-    const month = entry.timestamp.month
-    const year = entry.timestamp.year
-    const date = new CalendarDate(year, month, 0)
-    const label = `${new Date(0, month, 0).toLocaleString('default', { month: 'short' })} ${year}`
+    try {
+      const month = entry.timestamp.month
+      const year = entry.timestamp.year
+      const date = new CalendarDate(year, month, 0)
+      const label = `${new Date(0, month, 0).toLocaleString('default', { month: 'short' })} ${year}`
 
-    let monthlyResult = monthlyResults.find(e => e.date.toString() == date.toString())
-    if (!monthlyResult) {
-      let newLength = monthlyResults.push({ date: date, label: label, categorizedResults: [] })
-      monthlyResult = monthlyResults[newLength - 1]
-    }
+      let monthlyResult = monthlyResults.find(e => e.date.toString() == date.toString())
+      if (!monthlyResult) {
+        let newLength = monthlyResults.push({ date: date, label: label, categorizedResults: [] })
+        monthlyResult = monthlyResults[newLength - 1]
+      }
 
-    let categorizedResult = monthlyResult.categorizedResults.find(e => e.category == entry.category)
-    if (!categorizedResult) {
-      let newLength = monthlyResult.categorizedResults.push({ category: entry.category, balance: entry.amount })
-      categorizedResult = monthlyResult.categorizedResults[newLength - 1]
-    } else {
-      categorizedResult.balance += entry.amount
+      let categorizedResult = monthlyResult.categorizedResults.find(e => e.category == entry.category)
+      if (!categorizedResult) {
+        let newLength = monthlyResult.categorizedResults.push({ category: entry.category, balance: entry.amount })
+        categorizedResult = monthlyResult.categorizedResults[newLength - 1]
+      } else {
+        categorizedResult.balance += entry.amount
+      }
+    } catch (error) {
+      console.log(`Failed accumulating result for entry. '${error}'`)
     }
   })
 

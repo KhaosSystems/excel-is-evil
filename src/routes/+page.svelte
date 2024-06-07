@@ -18,6 +18,7 @@
   import { flatten, unflatten } from 'flat'
   import { read, utils, writeFileXLSX } from 'xlsx'
   import { Cell } from '$lib/components/ui/calendar'
+  import Calendar from '$lib/components/ui/calendar/calendar.svelte'
 
   Chart.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale)
 
@@ -103,6 +104,7 @@
     reader.readAsArrayBuffer(file)
   }
 
+  let importedResult: SolverResult
   /* handle file upload and read XLSX */
   function handleFileUpload(event) {
     const file = event.target.files[0]
@@ -112,39 +114,28 @@
       const wb = read(arrayBuffer)
       const ws = wb.Sheets[wb.SheetNames[0]]
       rows = utils.sheet_to_json(ws).slice(offset)
-      headers = rows[0]
-      rows = rows.slice(1)
+      console.log(rows)
 
-      // Loop over the array and sum the prices for each month
-      monthlySums = {}
-      rows.forEach(item => {
+      importedResult = { timestamps: [], categories: new Set<string>() }
+      rows.forEach(row => {
         try {
-          const date = item['__EMPTY_1']
-          const price = item['__EMPTY_6']
+          const date = row['__EMPTY_1']
+          const price = row['__EMPTY_6']
           const jsDate = excelDateToJSDate(date)
-          const yearMonth = jsDate.getFullYear() + '-' + (jsDate.getMonth() + 1)
 
-          if (!monthlySums[yearMonth]) {
-            monthlySums[yearMonth] = 0
-          }
-
-          monthlySums[yearMonth] += price
-        } catch (innerError) {
-          console.error('Error processing item:', item, innerError)
+          importedResult.timestamps.push({
+            timestamp: new CalendarDate(jsDate.getFullYear(), jsDate.getMonth(), jsDate.getDate()),
+            amount: price / 7.46, // In EUR
+            category: '_imported_',
+          })
+        } catch (error) {
+          console.log(`Failed to process row. '${error}'`)
         }
       })
+      console.log(importedResult)
 
-      const keys = Object.keys(monthlySums)
-      const values = keys.map(key => monthlySums[key])
-      data.datasets.push({
-        label: 'Actual Expenses',
-        data: values,
-        backgroundColor: 'rgba(255, 80, 80, 0.4)',
-        borderWidth: 2,
-        borderColor: 'rgba(255, 80, 80, 1)',
-      })
+      rebuild()
     }
-
     reader.readAsArrayBuffer(file)
   }
 
@@ -211,6 +202,10 @@
   let categoryToggles = []
   function rebuild() {
     let result = solver.solve(get(entries))
+    if (importedResult) {
+      result.timestamps = [...result.timestamps, ...importedResult.timestamps]
+      result.categories.add('_imported_')
+    }
     let monthlyResults = solver.accumulateMonthly(result)
 
     data.labels = monthlyResults.map(item => item.label)
@@ -251,10 +246,10 @@
         datasets.push({
           label: categoryName,
           data: monthlyBalance,
-          backgroundColor: colors[datasets.length % colors.length].backgroundColor,
+          backgroundColor: categoryName == '_imported_' ? 'rgba(255, 101, 101, 0.4)' : colors[datasets.length % colors.length].backgroundColor,
           borderWidth: 2,
-          borderColor: colors[datasets.length % colors.length].borderColor,
-          stack: 'Sum',
+          borderColor: categoryName == '_imported_' ? 'rgba(255, 101, 101, 1.0)' : colors[datasets.length % colors.length].borderColor,
+          stack: categoryName == '_imported_' ? 'Actual' : 'Expected',
         })
       }
     })
@@ -276,7 +271,7 @@
     <div class="flex flex-row gap-6">
       <div class="flex flex-row gap-1">
         <!-- add -->
-        <Button on:click={() => entries.update(e => [MakeRow(), ...e])} class="p-2" variant="outline"><Plus size="18" /></Button>
+        <Button on:click={() => entries.update(e => [MakeRow(), ...e])} class="p-2" variant="outline"><Plus size="20" /></Button>
 
         <!-- import -->
         <Input type="file" accept=".xlsx" id="import-entries" class="hidden" on:change={importEntriesFile} />
