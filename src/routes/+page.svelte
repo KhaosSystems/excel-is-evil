@@ -12,11 +12,12 @@
   import { Chart, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, type ChartData } from 'chart.js'
   import { RangeCalendar } from '$lib/components/ui/range-calendar'
   import { today, getLocalTimeZone, startOfYear, endOfYear, CalendarDate } from '@internationalized/date'
-  import { CalendarRange, TriangleAlert, Upload, Download, X } from 'lucide-svelte'
+  import { CalendarRange, TriangleAlert, Upload, Download, X, Plus } from 'lucide-svelte'
   import solver, { EntryInterval, EntryType, type Entry, type Result as SolverResult, type EntryTimeRange, type Currency } from '$lib/solver'
   import { get, writable, type Writable } from 'svelte/store'
   import { flatten, unflatten } from 'flat'
   import { read, utils, writeFileXLSX } from 'xlsx'
+  import { Cell } from '$lib/components/ui/calendar'
 
   Chart.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale)
 
@@ -41,7 +42,7 @@
 
   let offset = 3
 
-  let data: ChartData<"bar", (number | [number, number])[], unknown> = writable({ datasets: [] })
+  let data: ChartData<'bar', (number | [number, number])[], unknown> = writable({ datasets: [] })
 
   /* the component state is an array of presidents */
   let rows = []
@@ -184,14 +185,26 @@
     let newEntries = await rows.map(entry => {
       let unflattenedEntry: Entry = unflatten(entry)
       // Restore prototype for start and end dates
-      unflattenedEntry.timeRange.start = new CalendarDate(unflattenedEntry.timeRange.start.year, unflattenedEntry.timeRange.start.month, unflattenedEntry.timeRange.start.day)
-      unflattenedEntry.timeRange.end = new CalendarDate( unflattenedEntry.timeRange.end.year, unflattenedEntry.timeRange.end.month, unflattenedEntry.timeRange.end.day)
+      unflattenedEntry.timeRange.start = new CalendarDate(
+        unflattenedEntry.timeRange.start.year,
+        unflattenedEntry.timeRange.start.month,
+        unflattenedEntry.timeRange.start.day,
+      )
+      unflattenedEntry.timeRange.end = new CalendarDate(
+        unflattenedEntry.timeRange.end.year,
+        unflattenedEntry.timeRange.end.month,
+        unflattenedEntry.timeRange.end.day,
+      )
       return unflattenedEntry
     })
 
     // entries
-    entries.subscribe(e => { localStorage.entries = JSON.stringify(e) })
-    entries.subscribe(e => { rebuild() })
+    entries.subscribe(e => {
+      localStorage.entries = JSON.stringify(e)
+    })
+    entries.subscribe(e => {
+      rebuild()
+    })
     entries.set(newEntries)
   })
 
@@ -262,9 +275,10 @@
   <div class="flex flex-col flex-grow p-8 gap-2 bg-neutral-900">
     <div class="flex flex-row gap-6">
       <div class="flex flex-row gap-1">
+        <!-- add -->
+        <Button on:click={() => entries.update(e => [MakeRow(), ...e])} class="p-2" variant="outline"><Plus size="18" /></Button>
+
         <!-- import -->
-        <Button on:click={exportFile} variant="outline" class="p-2"><Download size="18" /></Button>
-        <!-- export -->
         <Input type="file" accept=".xlsx" id="import-entries" class="hidden" on:change={importEntriesFile} />
         <Button
           on:click={() => {
@@ -274,6 +288,8 @@
           variant="outline"
           class="p-2"><Upload size="18" /></Button
         >
+        <!-- export -->
+        <Button on:click={exportFile} variant="outline" class="p-2"><Download size="18" /></Button>
         <!-- Clear -->
         <AlertDialog.Root>
           <AlertDialog.Trigger asChild let:builder>
@@ -311,11 +327,10 @@
     </div>
 
     <Table.Root>
-      <Table.Caption>
-        <Button on:click={() => entries.update(e => [...e, MakeRow()])} variant="outline">Add Row</Button>
-      </Table.Caption>
+      <Table.Caption></Table.Caption>
       <Table.Header>
         <Table.Row>
+          <Table.Head class="w-0"></Table.Head>
           <Table.Head class="w-28">Type</Table.Head>
           <Table.Head>Description</Table.Head>
           <Table.Head class="w-32">Catagory</Table.Head>
@@ -325,8 +340,20 @@
         </Table.Row>
       </Table.Header>
       <Table.Body>
-        {#each $entries as entry}
+        {#each $entries as entry, index}
           <Table.Row>
+            <Table.Cell>
+              <Button
+                variant="ghost"
+                class="p-2 hover:bg-red-500"
+                on:click={() => {
+                  entries.update(e => {
+                    e.splice(index, 1)
+                    return e
+                  })
+                }}><X size="20" /></Button
+              >
+            </Table.Cell>
             <Table.Cell>
               <Select.Root selected={{ value: entry.type, label: entry.type }}>
                 <Select.Trigger>
@@ -346,7 +373,12 @@
               <Input type="text" placeholder="Hookers and cocaine..." bind:value={entry.description} />
             </Table.Cell>
             <Table.Cell>
-              <Select.Root selected={{ value: entry.category, label: entry.category }} onSelectedChange={v => { entry.category = v.value }}>
+              <Select.Root
+                selected={{ value: entry.category, label: entry.category }}
+                onSelectedChange={v => {
+                  entry.category = v.value
+                }}
+              >
                 <Select.Trigger>
                   <Select.Value placeholder="Select a category" class="capitalize" />
                 </Select.Trigger>
@@ -371,7 +403,10 @@
               </Select.Root>
             </Table.Cell>
             <Table.Cell class="flex flex-row">
-              <Input type="number" placeholder="1234.56" value={entry.amount}
+              <Input
+                type="number"
+                placeholder="1234.56"
+                value={entry.amount}
                 class="w-20 rounded-r-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 on:input={e => {
                   e.target.value = Number(e.target.value)
@@ -379,7 +414,12 @@
                 }}
               />
               <!-- Currency -->
-              <Select.Root selected={{ value: entry.currency, label: entry.currency.code }} onSelectedChange={v => { entry.currency = v.value }}>
+              <Select.Root
+                selected={{ value: entry.currency, label: entry.currency.code }}
+                onSelectedChange={v => {
+                  entry.currency = v.value
+                }}
+              >
                 <Select.Trigger class="rounded-l-none border-l-0">
                   <Select.Value placeholder="DKK" class="capitalize" />
                 </Select.Trigger>
@@ -396,7 +436,10 @@
             <Table.Cell>
               <Select.Root
                 selected={{ value: entry.interval, label: entry.interval }}
-                onSelectedChange={v => { entry.interval = v.value }}>
+                onSelectedChange={v => {
+                  entry.interval = v.value
+                }}
+              >
                 <Select.Trigger>
                   <Select.Value placeholder="Select an interval" class="capitalize" />
                 </Select.Trigger>
@@ -470,7 +513,7 @@
     <Alert.Root class="text-orange-400">
       <Alert.Description>
         <TriangleAlert class="h-4 w-4 inline mr-1" />
-        Missing features: deleting rows, loading e-conomics, working category colors (also on select)
+        Missing features: loading e-conomics, working category colors (also on select)
       </Alert.Description>
     </Alert.Root>
   </div>
