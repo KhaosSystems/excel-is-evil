@@ -13,17 +13,8 @@
   import { Chart, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, type ChartData } from 'chart.js'
   import { RangeCalendar } from '$lib/components/ui/range-calendar'
   import { today, getLocalTimeZone, startOfYear, endOfYear, CalendarDate } from '@internationalized/date'
-  import { CalendarRange, TriangleAlert, Upload, Download, X, Plus, Settings } from 'lucide-svelte'
-  import solver, {
-    EntryInterval,
-    EntryType,
-    type Entry,
-    type Result as SolverResult,
-    type SolverOptions,
-    type EntryTimeRange,
-    type Currency,
-    type Statistics,
-  } from '$lib/solver'
+  import { CalendarRange, TriangleAlert, Upload, Download, X, Plus, Settings, FileBarChart2 } from 'lucide-svelte'
+  import solver, { EntryInterval, EntryType, type Entry, type Result as SolverResult, type SolverOptions, type EntryTimeRange, type Currency, type Statistics } from '$lib/solver'
   import { get, writable, type Writable } from 'svelte/store'
   import { flatten, unflatten } from 'flat'
   import { Label } from '$lib/components/ui/label'
@@ -54,15 +45,17 @@
 
   let settings = writable({
     defaultCurrency: currencies[0],
-  })
 
-  let offset = 3
+    // Settings for importing general ledger from your accounting software using an excel file.
+    generalLedgerImportOffset: 0,
+    generalLedgerImportDateRowIndex: 0,
+    generalLedgerImportPriceRowIndex: 0,
+  })
 
   let data: ChartData<'bar', (number | [number, number])[], unknown> = writable({ datasets: [] })
 
   /* the component state is an array of presidents */
   let rows = []
-  let headers = []
 
   /* get state data and export to XLSX */
   function exportFile() {
@@ -88,7 +81,7 @@
     return unflattenedData
   }
 
-  function importEntriesFile(event) {
+  function importEntriesFile(event: EventTarget) {
     const file = event.target.files[0]
     const reader = new FileReader()
     reader.onload = e => {
@@ -97,19 +90,12 @@
       const ws = wb.Sheets[wb.SheetNames[0]]
       let rows = utils.sheet_to_json(ws)
 
+      utils.decode_range
       let newEntries = rows.map(entry => {
         let unflattenedEntry: Entry = unflatten(entry)
         // Restore prototype for start and end dates
-        unflattenedEntry.timeRange.start = new CalendarDate(
-          unflattenedEntry.timeRange.start.year,
-          unflattenedEntry.timeRange.start.month,
-          unflattenedEntry.timeRange.start.day,
-        )
-        unflattenedEntry.timeRange.end = new CalendarDate(
-          unflattenedEntry.timeRange.end.year,
-          unflattenedEntry.timeRange.end.month,
-          unflattenedEntry.timeRange.end.day,
-        )
+        unflattenedEntry.timeRange.start = new CalendarDate(unflattenedEntry.timeRange.start.year, unflattenedEntry.timeRange.start.month, unflattenedEntry.timeRange.start.day)
+        unflattenedEntry.timeRange.end = new CalendarDate(unflattenedEntry.timeRange.end.year, unflattenedEntry.timeRange.end.month, unflattenedEntry.timeRange.end.day)
         return unflattenedEntry
       })
 
@@ -121,8 +107,9 @@
 
   let importSettingsOpen: boolean = false
   let importedResult: SolverResult
+  let importedWorksheet = null
   /* handle file upload and read XLSX */
-  function handleFileUpload(event) {
+  function handleFileUpload(event: EventTarget) {
     importSettingsOpen = true
 
     const file = event.target.files[0]
@@ -130,15 +117,22 @@
     reader.onload = e => {
       const arrayBuffer = e.target.result
       const wb = read(arrayBuffer)
-      const ws = wb.Sheets[wb.SheetNames[0]]
-      rows = utils.sheet_to_json(ws).slice(offset)
-      console.log(rows)
+      importedWorksheet = wb.Sheets[wb.SheetNames[0]]
+
+      processImportedEntriesSheet()
+    }
+    reader.readAsArrayBuffer(file)
+  }
+
+  function processImportedEntriesSheet() {
+    if (importedWorksheet) {
+      rows = utils.sheet_to_json(importedWorksheet).slice($settings.generalLedgerImportOffset)
 
       importedResult = { timestamps: [], categories: new Set<string>() }
-      rows.forEach(row => {
+      rows.slice(1).forEach(row => {
         try {
-          const date = row['__EMPTY_1']
-          const price = row['__EMPTY_6']
+          const date = row[Object.keys(row)[$settings.generalLedgerImportDateRowIndex]]
+          const price = row[Object.keys(row)[$settings.generalLedgerImportPriceRowIndex]]
           const jsDate = excelDateToJSDate(date)
 
           importedResult.timestamps.push({
@@ -150,11 +144,9 @@
           console.log(`Failed to process row. '${error}'`)
         }
       })
-      console.log(importedResult)
 
       rebuild()
     }
-    reader.readAsArrayBuffer(file)
   }
 
   // Helper function to convert Excel date to JavaScript date
@@ -167,13 +159,7 @@
   // Initialize an empty object to store the sums for each month
   let monthlySums = {}
 
-  const MakeRow = (
-    type: EntryType = EntryType.Expense,
-    description: string = 'description',
-    amount: number = 0,
-    category: string = 'miscellaneous',
-    interval: EntryInterval = EntryInterval.Monthly,
-  ) => {
+  const MakeRow = (type: EntryType = EntryType.Expense, description: string = 'description', amount: number = 0, category: string = 'miscellaneous', interval: EntryInterval = EntryInterval.Monthly) => {
     return {
       type: type,
       description: description,
@@ -196,35 +182,21 @@
     let newEntries = await rows.map(entry => {
       let unflattenedEntry: Entry = unflatten(entry)
       // Restore prototype for start and end dates
-      unflattenedEntry.timeRange.start = new CalendarDate(
-        unflattenedEntry.timeRange.start.year,
-        unflattenedEntry.timeRange.start.month,
-        unflattenedEntry.timeRange.start.day,
-      )
-      unflattenedEntry.timeRange.end = new CalendarDate(
-        unflattenedEntry.timeRange.end.year,
-        unflattenedEntry.timeRange.end.month,
-        unflattenedEntry.timeRange.end.day,
-      )
+      unflattenedEntry.timeRange.start = new CalendarDate(unflattenedEntry.timeRange.start.year, unflattenedEntry.timeRange.start.month, unflattenedEntry.timeRange.start.day)
+      unflattenedEntry.timeRange.end = new CalendarDate(unflattenedEntry.timeRange.end.year, unflattenedEntry.timeRange.end.month, unflattenedEntry.timeRange.end.day)
       return unflattenedEntry
     })
 
     // entries
-    entries.subscribe(e => {
-      localStorage.entries = JSON.stringify(e)
-    })
-    entries.subscribe(e => {
-      rebuild()
-    })
+    entries.subscribe(e => { localStorage.entries = JSON.stringify(e) })
+    entries.subscribe(e => { rebuild() })
     entries.set(newEntries)
 
     // settings local storage
-    if (localStorage.settings) {
-      localStorage.settings = JSON.parse(localStorage.settings)
-    }
-    settings.subscribe(s => {
-      localStorage.settings = JSON.stringify(s)
-    })
+    const storedSettings = localStorage.settings ? JSON.parse(localStorage.settings) : $settings
+    settings.subscribe(s => { localStorage.settings = JSON.stringify(s) })
+    settings.subscribe(s => processImportedEntriesSheet())
+    settings.set(storedSettings)
   })
 
   let categoryToggles = []
@@ -295,6 +267,70 @@
   $: categoryToggles, rebuild()
 </script>
 
+<!-- import from accounting software settings -->
+<Dialog.Root bind:open={importSettingsOpen}>
+  <Dialog.Content class="bg-neutral-900 !max-w-screen-xl">
+    <Dialog.Header>
+      <Dialog.Title>Import Settings</Dialog.Title>
+    </Dialog.Header>
+    <div class="grid w-full items-center gap-1.5">
+      <!-- currency -->
+      <Label for="default-currency">Default Currency</Label>
+      <Select.Root selected={{ value: $settings.defaultCurrency, label: $settings.defaultCurrency.code }}>
+        <Select.Trigger id="default-currency">
+          <Select.Value placeholder="DKK" class="capitalize" />
+        </Select.Trigger>
+        <Select.Content>
+          <Select.Group>
+            {#each currencies as currency}
+              <Select.Item value={currency} class="uppercase">{currency.code}</Select.Item>
+            {/each}
+          </Select.Group>
+        </Select.Content>
+        <Select.Input name="favoriteFruit" />
+      </Select.Root>
+
+      <!-- range -->
+      <Label>Import Offset</Label>
+      <Input type="number" bind:value={$settings.generalLedgerImportOffset} />
+
+      <!-- range -->
+      <Label>Date Row Index</Label>
+      <Input type="number" bind:value={$settings.generalLedgerImportDateRowIndex} />
+
+      <!-- range -->
+      <Label>Price Row Index</Label>
+      <Input type="number" bind:value={$settings.generalLedgerImportPriceRowIndex} />
+
+      <!-- data -->
+      {#if rows.length}
+        <Table.Root>
+          <Table.Header>
+            <Table.Row>
+              {#each Object.keys(rows[0]) as key}
+                <Table.Head class="w-40">{rows[0][key]}</Table.Head>
+              {/each}
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {#each rows.slice(1, 10) as row}
+              <Table.Row>
+                {#each Object.keys(row) as key, index}
+                  <Table.Cell class={`${index == $settings.generalLedgerImportDateRowIndex ? 'text-blue-500' : index == $settings.generalLedgerImportPriceRowIndex ? 'text-green-500' : ''}`}>{row[key]}</Table.Cell>
+                {/each}
+              </Table.Row>
+            {/each}
+          </Table.Body>
+        </Table.Root>
+      {/if}
+    </div>
+
+    <Dialog.Footer>
+      <Dialog.Close class={`${buttonVariants({ variant: 'default', size: 'default' })}`}>Close</Dialog.Close>
+    </Dialog.Footer>
+  </Dialog.Content>
+</Dialog.Root>
+
 <div class="flex flex-col min-h-screen">
   <div class="flex flex-row p-8 bg-neutral-950 gap-8">
     <div class="flex-grow justify-center h-96">
@@ -346,77 +382,12 @@
     </div>
   </div>
 
-  <!-- import settings -->
-  <Dialog.Root bind:open={importSettingsOpen}>
-    <Dialog.Content class="sm:max-w-[425px] bg-neutral-900">
-      <Dialog.Header>
-        <Dialog.Title>Import Settings</Dialog.Title>
-      </Dialog.Header>
-      <div class="grid w-full max-w-sm items-center gap-1.5">
-        <Label for="default-currency">Default Currency</Label>
-        <Select.Root selected={{ value: $settings.defaultCurrency, label: $settings.defaultCurrency.code }}>
-          <Select.Trigger id="default-currency">
-            <Select.Value placeholder="DKK" class="capitalize" />
-          </Select.Trigger>
-          <Select.Content>
-            <Select.Group>
-              {#each currencies as currency}
-                <Select.Item value={currency} class="uppercase">{currency.code}</Select.Item>
-              {/each}
-            </Select.Group>
-          </Select.Content>
-          <Select.Input name="favoriteFruit" />
-        </Select.Root>
-
-        {#if rows.length || headers.length}
-          <Table.Root class="max-h-96">
-            <Table.Caption>
-              <Button>Add Row</Button>
-            </Table.Caption>
-            <Table.Header>
-              <Table.Row>
-                {#each Object.keys(headers) as key}
-                  <Table.Head class="w-40">{key}</Table.Head>
-                {/each}
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {#each rows as row}
-                <Table.Row>
-                  {#each Object.keys(row) as key}
-                    <Table.Cell>{row[key]}</Table.Cell>
-                  {/each}
-                </Table.Row>
-              {/each}
-            </Table.Body>
-          </Table.Root>
-        {/if}
-      </div>
-
-      <Dialog.Footer>
-        <Dialog.Close class={`${buttonVariants({ variant: 'default', size: 'default' })}`}>Close</Dialog.Close>
-      </Dialog.Footer>
-    </Dialog.Content>
-  </Dialog.Root>
-
   <div class="flex flex-col flex-grow p-8 gap-2 bg-neutral-900">
     <div class="flex flex-row gap-6">
       <div class="flex flex-row gap-1">
         <!-- add -->
         <Button on:click={() => entries.update(e => [MakeRow(), ...e])} class="p-2" variant="outline"><Plus size="20" /></Button>
 
-        <!-- import -->
-        <Input type="file" accept=".xlsx" id="import-entries" class="hidden" on:change={importEntriesFile} />
-        <Button
-          on:click={() => {
-            document.getElementById('import-entries').click()
-          }}
-          id="import-entries"
-          variant="outline"
-          class="p-2"><Upload size="18" /></Button
-        >
-        <!-- export -->
-        <Button on:click={exportFile} variant="outline" class="p-2"><Download size="18" /></Button>
         <!-- Clear -->
         <AlertDialog.Root>
           <AlertDialog.Trigger asChild let:builder>
@@ -437,6 +408,32 @@
             </AlertDialog.Footer>
           </AlertDialog.Content>
         </AlertDialog.Root>
+
+        <!-- import -->
+        <Input type="file" accept=".xlsx" id="import-entries" class="hidden" on:change={importEntriesFile} />
+        <Button
+          on:click={() => {
+            document.getElementById('import-entries').click()
+          }}
+          id="import-entries"
+          variant="outline"
+          class="p-2"><Upload size="18" /></Button
+        >
+
+        <!-- export -->
+        <Button on:click={exportFile} variant="outline" class="p-2"><Download size="18" /></Button>
+
+        <!-- import comparison data -->
+        <Input type="file" accept=".xlsx" id="import-comparison-data" class="hidden" on:change={handleFileUpload} />
+        <Button
+          on:click={() => {
+            document.getElementById('import-comparison-data').click()
+          }}
+          id="import-entries"
+          variant="outline"
+          class="p-2"><FileBarChart2 size="18" /></Button
+        >
+
         <!-- settings -->
         <Dialog.Root>
           <Dialog.Trigger class={`${buttonVariants({ variant: 'outline' })} !p-2`}><Settings size="18" /></Dialog.Trigger>
@@ -635,25 +632,10 @@
       </Table.Body>
     </Table.Root>
 
-    <Tabs.Root value="budgeteditor" class="w-full">
-      <Tabs.List>
-        <Tabs.Trigger value="budgeteditor">Budget Editor</Tabs.Trigger>
-        <Tabs.Trigger value="production">Production</Tabs.Trigger>
-      </Tabs.List>
-      <Tabs.Content value="budgeteditor"></Tabs.Content>
-      <Tabs.Content value="production">
-        <div class="flex gap-4">
-          Offset
-          <Input type="number" bind:value={offset} />
-          <Input type="file" accept=".xlsx" on:change={handleFileUpload} />
-        </div>
-      </Tabs.Content>
-    </Tabs.Root>
-
     <Alert.Root class="text-orange-400">
       <Alert.Description>
         <TriangleAlert class="h-4 w-4 inline mr-1" />
-        Missing features: better import, timeline
+        Missing features: better import, timeline, graph currency, cash flow, dark/light mode, day/month intervals on bar chart
       </Alert.Description>
     </Alert.Root>
   </div>
