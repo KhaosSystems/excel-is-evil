@@ -39,6 +39,10 @@ export interface Entry {
   timeRange: EntryTimeRange
 }
 
+export interface SolverOptions {
+  excludedCategories: string[]
+}
+
 export interface TimestampEntry {
   timestamp: CalendarDate
   // In EUR
@@ -51,12 +55,16 @@ export interface Result {
   categories: Set<string>
 }
 
-export function solve(entries: Entry[]): Result {
+export function solve(entries: Entry[], options: SolverOptions = { excludedCategories: [] }): Result {
   let result: Result = { timestamps: [], categories: new Set<string>() }
 
   entries.forEach(entry => {
     try {
       if (entry.interval == EntryInterval.Never) {
+        return
+      }
+
+      if (options.excludedCategories.includes(entry.category)) {
         return
       }
 
@@ -178,7 +186,77 @@ export function accumulateMonthly(result: Result): MonthlyResult[] {
   return filledMonthlyResults
 }
 
+export type Statistics = {
+  // overview
+  total: number
+  // average
+  dailyAverage: number
+  weeklyAverage: number
+  monthlyAverage: number
+  quarterlyAverage: number
+  // duration
+  days: number
+  months: number
+  years: number
+}
+
+function getDaysDifference(startDate: Date, endDate: Date): number {
+  const msPerDay = 1000 * 60 * 60 * 24
+  return Math.round((endDate.getTime() - startDate.getTime()) / msPerDay)
+}
+
+function getMonthsDifference(startDate: Date, endDate: Date): number {
+  return (endDate.getFullYear() - startDate.getFullYear()) * 12 + endDate.getMonth() - startDate.getMonth()
+}
+
+function getYearsDifference(startDate: Date, endDate: Date): number {
+  return endDate.getFullYear() - startDate.getFullYear()
+}
+
+export function calculateStatistics(result: Result): Statistics {
+  const total = result.timestamps.reduce((a, e) => a + e.amount, 0)
+
+  if (result.timestamps.length === 0) {
+    return {
+      total,
+      dailyAverage: 0,
+      weeklyAverage: 0,
+      monthlyAverage: 0,
+      quarterlyAverage: 0,
+      days: 0,
+      months: 0,
+      years: 0,
+    }
+  }
+
+  // Sort timestamps to find the earliest and latest dates
+  const sortedTimestamps = result.timestamps.slice().sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+  const startDate = new Date(sortedTimestamps[0].timestamp)
+  const endDate = new Date(sortedTimestamps[sortedTimestamps.length - 1].timestamp)
+
+  const days = getDaysDifference(startDate, endDate) + 1 // +1 to include both start and end date
+  const months = getMonthsDifference(startDate, endDate) + 1
+  const years = getYearsDifference(startDate, endDate) + 1
+
+  const dailyAverage = days ? total / days : 0
+  const weeklyAverage = days ? total / (days / 7) : 0
+  const monthlyAverage = months ? total / months : 0
+  const quarterlyAverage = months ? total / (months / 3) : 0
+
+  return {
+    total,
+    dailyAverage,
+    weeklyAverage,
+    monthlyAverage,
+    quarterlyAverage,
+    days,
+    months,
+    years,
+  }
+}
+
 export default {
   solve,
   accumulateMonthly,
+  calculateStatistics,
 }

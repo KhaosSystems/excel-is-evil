@@ -14,7 +14,16 @@
   import { RangeCalendar } from '$lib/components/ui/range-calendar'
   import { today, getLocalTimeZone, startOfYear, endOfYear, CalendarDate } from '@internationalized/date'
   import { CalendarRange, TriangleAlert, Upload, Download, X, Plus, Settings } from 'lucide-svelte'
-  import solver, { EntryInterval, EntryType, type Entry, type Result as SolverResult, type EntryTimeRange, type Currency } from '$lib/solver'
+  import solver, {
+    EntryInterval,
+    EntryType,
+    type Entry,
+    type Result as SolverResult,
+    type SolverOptions,
+    type EntryTimeRange,
+    type Currency,
+    type Statistics,
+  } from '$lib/solver'
   import { get, writable, type Writable } from 'svelte/store'
   import { flatten, unflatten } from 'flat'
   import { Label } from '$lib/components/ui/label'
@@ -110,9 +119,12 @@
     reader.readAsArrayBuffer(file)
   }
 
+  let importSettingsOpen: boolean = false
   let importedResult: SolverResult
   /* handle file upload and read XLSX */
   function handleFileUpload(event) {
+    importSettingsOpen = true
+
     const file = event.target.files[0]
     const reader = new FileReader()
     reader.onload = e => {
@@ -174,6 +186,9 @@
   }
 
   let entries: Writable<Entry[]> = writable([])
+  let statistics: Writable<Statistics> = writable({
+    total: 0,
+  })
 
   onMount(async () => {
     // load from local storage
@@ -214,7 +229,14 @@
 
   let categoryToggles = []
   function rebuild() {
-    let result = solver.solve(get(entries))
+    let result = solver.solve(get(entries), {
+      excludedCategories: categoryToggles.reduce((categories, toggle) => (toggle.enabled ? categories : [...categories, toggle.category]), []),
+    })
+
+    // calculate statistics
+    statistics.set(solver.calculateStatistics(result))
+
+    //
     if (importedResult) {
       result.timestamps = [...result.timestamps, ...importedResult.timestamps]
       result.categories.add('_imported_')
@@ -274,8 +296,8 @@
 </script>
 
 <div class="flex flex-col min-h-screen">
-  <div class="p-8 bg-neutral-950">
-    <div class="flex justify-center w-full h-96 mb-6">
+  <div class="flex flex-row p-8 bg-neutral-950 gap-8">
+    <div class="flex-grow justify-center h-96">
       <Bar
         {data}
         options={{
@@ -299,7 +321,83 @@
         }}
       />
     </div>
+    <div class="flex-0 w-64 border-l">
+      <div class="flex flex-col gap-2 px-6 py-2">
+        <div>
+          <div class="opacity-50">Statistics</div>
+          <div class="opacity-75 font-semibold">Total: {$statistics.total} EUR</div>
+        </div>
+
+        <div>
+          <div class="opacity-50">Statistics / Averages</div>
+          <div class="opacity-75 font-semibold">Daily: {$statistics.dailyAverage.toFixed(2)} EUR</div>
+          <div class="opacity-75 font-semibold">Weekly: {$statistics.weeklyAverage.toFixed(2)} EUR</div>
+          <div class="opacity-75 font-semibold">Monthly: {$statistics.monthlyAverage.toFixed(2)} EUR</div>
+          <div class="opacity-75 font-semibold">Quarterly: {$statistics.quarterlyAverage.toFixed(2)} EUR</div>
+        </div>
+
+        <div>
+          <div class="opacity-50">Statistics / Duration</div>
+          <div class="opacity-75 font-semibold">Days: {$statistics.days}</div>
+          <div class="opacity-75 font-semibold">Months: {$statistics.months}</div>
+          <div class="opacity-75 font-semibold">Years: {$statistics.years}</div>
+        </div>
+      </div>
+    </div>
   </div>
+
+  <!-- import settings -->
+  <Dialog.Root bind:open={importSettingsOpen}>
+    <Dialog.Content class="sm:max-w-[425px] bg-neutral-900">
+      <Dialog.Header>
+        <Dialog.Title>Import Settings</Dialog.Title>
+      </Dialog.Header>
+      <div class="grid w-full max-w-sm items-center gap-1.5">
+        <Label for="default-currency">Default Currency</Label>
+        <Select.Root selected={{ value: $settings.defaultCurrency, label: $settings.defaultCurrency.code }}>
+          <Select.Trigger id="default-currency">
+            <Select.Value placeholder="DKK" class="capitalize" />
+          </Select.Trigger>
+          <Select.Content>
+            <Select.Group>
+              {#each currencies as currency}
+                <Select.Item value={currency} class="uppercase">{currency.code}</Select.Item>
+              {/each}
+            </Select.Group>
+          </Select.Content>
+          <Select.Input name="favoriteFruit" />
+        </Select.Root>
+
+        {#if rows.length || headers.length}
+          <Table.Root class="max-h-96">
+            <Table.Caption>
+              <Button>Add Row</Button>
+            </Table.Caption>
+            <Table.Header>
+              <Table.Row>
+                {#each Object.keys(headers) as key}
+                  <Table.Head class="w-40">{key}</Table.Head>
+                {/each}
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {#each rows as row}
+                <Table.Row>
+                  {#each Object.keys(row) as key}
+                    <Table.Cell>{row[key]}</Table.Cell>
+                  {/each}
+                </Table.Row>
+              {/each}
+            </Table.Body>
+          </Table.Root>
+        {/if}
+      </div>
+
+      <Dialog.Footer>
+        <Dialog.Close class={`${buttonVariants({ variant: 'default', size: 'default' })}`}>Close</Dialog.Close>
+      </Dialog.Footer>
+    </Dialog.Content>
+  </Dialog.Root>
 
   <div class="flex flex-col flex-grow p-8 gap-2 bg-neutral-900">
     <div class="flex flex-row gap-6">
@@ -549,37 +647,13 @@
           <Input type="number" bind:value={offset} />
           <Input type="file" accept=".xlsx" on:change={handleFileUpload} />
         </div>
-
-        {#if rows.length || headers.length}
-          <Table.Root>
-            <Table.Caption>
-              <Button>Add Row</Button>
-            </Table.Caption>
-            <Table.Header>
-              <Table.Row>
-                {#each Object.keys(headers) as key}
-                  <Table.Head class="w-40">{key}</Table.Head>
-                {/each}
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {#each rows as row}
-                <Table.Row>
-                  {#each Object.keys(row) as key}
-                    <Table.Cell>{row[key]}</Table.Cell>
-                  {/each}
-                </Table.Row>
-              {/each}
-            </Table.Body>
-          </Table.Root>
-        {/if}
       </Tabs.Content>
     </Tabs.Root>
 
     <Alert.Root class="text-orange-400">
       <Alert.Description>
         <TriangleAlert class="h-4 w-4 inline mr-1" />
-        Missing features: loading e-conomics, working category colors (also on select)
+        Missing features: better import, timeline
       </Alert.Description>
     </Alert.Root>
   </div>
