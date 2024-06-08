@@ -211,8 +211,6 @@ export function accumulateMonthly(result: Result): MonthlyResult[] {
       console.error(`Something went wrong. '${error}'`);
     }
 
-    console.warn(monthlyResults)
-
     // Move to the next month
     currentDate = currentDate.add({ months: 1 });
   }

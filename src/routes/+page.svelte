@@ -271,7 +271,6 @@
     let monthlyResults = solver.accumulateMonthly(result)
     let newLabels = monthlyResults.map(item => item.date.toString())
 
-    console.log(monthlyResults)
     // calculate statistics
     statistics.set(solver.calculateStatistics(result, { ignoreImported: true }))
 
