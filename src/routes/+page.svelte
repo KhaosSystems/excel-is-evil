@@ -138,7 +138,8 @@
           const jsDate = excelDateToJSDate(date)
 
           importedResult.timestamps.push({
-            timestamp: new CalendarDate(jsDate.getFullYear(), jsDate.getMonth(), jsDate.getDate()),
+            // Convert the zero-based month index from the JavaScript Date object to a one-based index suitable for the CalendarDate constructor.
+            timestamp: new CalendarDate(jsDate.getFullYear(), jsDate.getMonth() + 1, jsDate.getDate()),
             amount: price / $settings.generalLedgerImportCurrency.rate, // In EUR
             category: '_imported_',
           })
@@ -147,16 +148,37 @@
         }
       })
 
+      console.log(rows)
+      console.log(importedResult)
+
       rebuild()
     }
   }
 
-  // Helper function to convert Excel date to JavaScript date
-  function excelDateToJSDate(excelDate) {
+  /*function excelDateToJSDate(excelDate) {
     // Excel's date system starts on January 1, 1900, which is day 1
     const excelEpoch = new Date(1899, 11, 30)
     return new Date(excelEpoch.getTime() + excelDate * 24 * 60 * 60 * 1000)
-  }
+  }*/
+  // Helper function to convert Excel date to JavaScript date
+  function excelDateToJSDate(serial) {
+   var utc_days  = Math.floor(serial - 25569);
+   var utc_value = utc_days * 86400;                                        
+   var date_info = new Date(utc_value * 1000);
+
+   var fractional_day = serial - Math.floor(serial) + 0.0000001;
+
+   var total_seconds = Math.floor(86400 * fractional_day);
+
+   var seconds = total_seconds % 60;
+
+   total_seconds -= seconds;
+
+   var hours = Math.floor(total_seconds / (60 * 60));
+   var minutes = Math.floor(total_seconds / 60) % 60;
+
+   return new Date(date_info.getFullYear(), date_info.getMonth(), date_info.getDate(), hours, minutes, seconds);
+}
 
   const MakeRow = (type: EntryType = EntryType.Expense, description: string = 'description', amount: number = 0, category: string = 'miscellaneous', interval: EntryInterval = EntryInterval.Monthly) => {
     return {
@@ -203,13 +225,10 @@
       excludedCategories: categoryToggles.reduce((categories, toggle) => (toggle.enabled ? categories : [...categories, toggle.category]), []),
     })
 
-    // Convert to graphCurrency from settings
-    result.timestamps.forEach(value => value.amount *= $settings.graphCurrency.rate)
-
     // calculate statistics
     statistics.set(solver.calculateStatistics(result))
 
-    //
+    // merge with results
     if (importedResult) {
       result.timestamps = [...result.timestamps, ...importedResult.timestamps]
       result.categories.add('_imported_')
@@ -276,7 +295,7 @@
     </Dialog.Header>
     <div class="grid w-full items-center gap-1.5">
       <!-- currency -->
-      <Label for="default-currency">Default Currency</Label>
+      <Label>Currency</Label>
       <Select.Root selected={{ value: $settings.generalLedgerImportCurrency, label: $settings.generalLedgerImportCurrency.code }}
       onSelectedChange={v => {
         settings.update(s => {
@@ -350,14 +369,14 @@
           scales: {
             y: {
               ticks: {
-                callback: (value, index, ticks) => `${value} ${$settings.graphCurrency.code}`,
+                callback: (value, index, ticks) => `${parseInt(value) * $settings.graphCurrency.rate} ${$settings.graphCurrency.code}`,
               },
             },
           },
           plugins: {
             tooltip: {
               callbacks: {
-                label: item => `${item.dataset.label}: ${item.formattedValue} ${$settings.graphCurrency.code}`,
+                label: item => `${item.dataset.label}: ${parseFloat(item.formattedValue.replace(".", "")).toFixed(2) * $settings.graphCurrency.rate} ${$settings.graphCurrency.code}`,
               },
             },
           },
@@ -368,15 +387,15 @@
       <div class="flex flex-col gap-2 px-6 py-2">
         <div>
           <div class="opacity-50">Statistics</div>
-          <div class="opacity-75 font-semibold">Total: {$statistics.total.toFixed(2)} {$settings.graphCurrency.code}</div>
+          <div class="opacity-75 font-semibold">Total: {($statistics.total * $settings.graphCurrency.rate).toFixed(2)} {$settings.graphCurrency.code}</div>
         </div>
 
         <div>
           <div class="opacity-50">Statistics / Averages</div>
-          <div class="opacity-75 font-semibold">Daily: {$statistics.dailyAverage.toFixed(2)} {$settings.graphCurrency.code}</div>
-          <div class="opacity-75 font-semibold">Weekly: {$statistics.weeklyAverage.toFixed(2)} {$settings.graphCurrency.code}</div>
-          <div class="opacity-75 font-semibold">Monthly: {$statistics.monthlyAverage.toFixed(2)} {$settings.graphCurrency.code}</div>
-          <div class="opacity-75 font-semibold">Quarterly: {$statistics.quarterlyAverage.toFixed(2)} {$settings.graphCurrency.code}</div>
+          <div class="opacity-75 font-semibold">Daily: {($statistics.dailyAverage * $settings.graphCurrency.rate).toFixed(2)} {$settings.graphCurrency.code}</div>
+          <div class="opacity-75 font-semibold">Weekly: {($statistics.weeklyAverage * $settings.graphCurrency.rate).toFixed(2)} {$settings.graphCurrency.code}</div>
+          <div class="opacity-75 font-semibold">Monthly: {($statistics.monthlyAverage * $settings.graphCurrency.rate).toFixed(2)} {$settings.graphCurrency.code}</div>
+          <div class="opacity-75 font-semibold">Quarterly: {($statistics.quarterlyAverage * $settings.graphCurrency.rate).toFixed(2)} {$settings.graphCurrency.code}</div>
         </div>
 
         <div>
@@ -665,7 +684,7 @@
     <Alert.Root class="text-orange-400">
       <Alert.Description>
         <TriangleAlert class="h-4 w-4 inline mr-1" />
-        Missing features: timeline, graph currency, cash flow, dark/light mode, day/month intervals on bar chart
+        Missing features: import account when looking at general ledger, timeline, graph currency, cash flow, dark/light mode, day/month intervals on bar chart
       </Alert.Description>
     </Alert.Root>
   </div>

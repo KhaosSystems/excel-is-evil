@@ -130,36 +130,40 @@ export function accumulateMonthly(result: Result): MonthlyResult[] {
   }
 
   const monthlyResults: MonthlyResult[] = []
-
-  result.timestamps.forEach(entry => {
+  console.log(result.timestamps)
+  result.timestamps.forEach((entry, index) => {
     try {
-      const month = entry.timestamp.month
-      const year = entry.timestamp.year
-      const date = new CalendarDate(year, month, 0)
-      const label = generateLabel(year, month)
-
-      let monthlyResult = monthlyResults.find(e => e.date.toString() == date.toString())
-      if (!monthlyResult) {
-        let newLength = monthlyResults.push({ date: date, label: label, categorizedResults: [] })
-        monthlyResult = monthlyResults[newLength - 1]
-      }
-
-      let categorizedResult = monthlyResult.categorizedResults.find(e => e.category == entry.category)
-      if (!categorizedResult) {
-        let newLength = monthlyResult.categorizedResults.push({ category: entry.category, balance: entry.amount })
-        categorizedResult = monthlyResult.categorizedResults[newLength - 1]
+      // Validate the timestamp properties
+      if (entry.timestamp && typeof entry.timestamp.year === 'number' && typeof entry.timestamp.month === 'number') {
+        const date = new CalendarDate(entry.timestamp.year, entry.timestamp.month, 1);
+        const label = generateLabel(entry.timestamp.year, entry.timestamp.month);
+  
+        let monthlyResult = monthlyResults.find(e => e.date.compare(date) == 0);
+        if (!monthlyResult) {
+          monthlyResult = { date: date, label: label, categorizedResults: [] };
+          monthlyResults.push(monthlyResult);
+        }
+  
+        let categorizedResult = monthlyResult.categorizedResults.find(e => e.category === entry.category);
+        if (!categorizedResult) {
+          categorizedResult = { category: entry.category, balance: entry.amount };
+          monthlyResult.categorizedResults.push(categorizedResult);
+        } else {
+          categorizedResult.balance += entry.amount;
+        }
       } else {
-        categorizedResult.balance += entry.amount
+        throw new Error("Invalid timestamp in entry");
       }
     } catch (error) {
-      console.log(`Failed accumulating result for entry. '${error}'`)
+      console.log(`Failed accumulating result for entry ${index}. Error: '${error.message}'`);
     }
-  })
+  });
+  
+  // Log the final results to debug
+  console.log('Final monthly results:', JSON.stringify(monthlyResults, null, 2));
 
   // Sort months
-  monthlyResults.sort((a, b) => {
-    return a.date.compare(b.date)
-  })
+  monthlyResults.sort((a, b) => a.date.compare(b.date))
 
   // Insert empty results for missing months
   const filledMonthlyResults: MonthlyResult[] = []
