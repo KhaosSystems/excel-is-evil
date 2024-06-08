@@ -10,15 +10,15 @@
   import { Bar } from 'svelte-chartjs'
   import { Button, buttonVariants } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
-  import { Chart, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, type ChartData } from 'chart.js'
+  import { Chart, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, type ChartData, type ChartDataset, type DefaultDataPoint } from 'chart.js'
   import { RangeCalendar } from '$lib/components/ui/range-calendar'
   import { today, getLocalTimeZone, startOfYear, endOfYear, CalendarDate } from '@internationalized/date'
   import { CalendarRange, TriangleAlert, Upload, Download, X, Plus, Settings, FileBarChart2 } from 'lucide-svelte'
-  import solver, { EntryInterval, EntryType, type Entry, type Result as SolverResult, type SolverOptions, type EntryTimeRange, type Currency, type Statistics } from '$lib/solver'
+  import solver, { EntryInterval, EntryType, type Entry, type Result as SolverResult, Category, type SolverOptions, type EntryTimeRange, type Currency, type Statistics } from '$lib/solver'
   import { get, writable, type Writable } from 'svelte/store'
   import { flatten, unflatten } from 'flat'
   import { Label } from '$lib/components/ui/label'
-  import { read, utils, writeFileXLSX } from 'xlsx'
+  import { read, utils, writeFileXLSX, type WorkBook, type WorkSheet } from 'xlsx'
   import { Cell } from '$lib/components/ui/calendar'
   import Calendar from '$lib/components/ui/calendar/calendar.svelte'
 
@@ -30,28 +30,61 @@
     { code: 'USD', rate: 1.09 },
   ]
 
-  const colors = [
-    { backgroundColor: 'rgba(255, 177, 101, 0.4)', borderColor: 'rgba(255, 177, 101, 1)' },
-    { backgroundColor: 'rgba(101, 255, 137, 0.4)', borderColor: 'rgba(101, 255, 137, 1)' },
-    { backgroundColor: 'rgba(101, 157, 255, 0.4)', borderColor: 'rgba(101, 157, 255, 1)' },
-    { backgroundColor: 'rgba(255, 101, 101, 0.4)', borderColor: 'rgba(255, 101, 101, 1)' },
-    { backgroundColor: 'rgba(255, 251, 101, 0.4)', borderColor: 'rgba(255, 251, 101, 1)' },
-    { backgroundColor: 'rgba(137, 101, 255, 0.4)', borderColor: 'rgba(137, 101, 255, 1)' },
-    { backgroundColor: 'rgba(101, 255, 241, 0.4)', borderColor: 'rgba(101, 255, 241, 1)' },
-    { backgroundColor: 'rgba(177, 101, 255, 0.4)', borderColor: 'rgba(177, 101, 255, 1)' },
-    { backgroundColor: 'rgba(255, 101, 221, 0.4)', borderColor: 'rgba(255, 101, 221, 1)' },
-    { backgroundColor: 'rgba(101, 255, 101, 0.4)', borderColor: 'rgba(101, 255, 101, 1)' },
+  interface Settings {
+    defaultCurrency: Currency
+    graphCurrency: Currency
+
+    categories: Category[]
+
+    // Settings for importing general ledger from your accounting software using an excel file.
+    generalLedgerImportCurrency: Currency
+    generalLedgerImportOffset: number
+    generalLedgerImportDateRowIndex: number
+    generalLedgerImportPriceRowIndex: number
+    generalLedgerImportAccountRowIndex: number
+  }
+
+  class CategoryPreset {
+    name: string
+    categories: Category[]
+
+    constructor(name: string, categories: Category[]) {
+      this.name = name
+      this.categories = categories
+    }
+  }
+
+  let categoryPresets: CategoryPreset[] = [
+    new CategoryPreset('Game Development', [new Category('Salaries', 1), new Category('Software', 2), new Category('Hardware', 3), new Category('Travel & Events', 4), new Category('Administration', 5)]),
+    new CategoryPreset('e-conomic', [
+      new Category('Lønninger', 2210),
+      new Category('B-honorar', 2213),
+      new Category('Restaurationsbesøg', 2750),
+      new Category('Rejseudgifter', 2770),
+      new Category('Husleje', 3410),
+      new Category('El, vand og gas', 3420),
+      new Category('Edb-udgifter / software', 3604),
+      new Category('Rep./vedligeholdelse af inventar', 3610),
+      new Category('Mindre anskaffelser', 3617),
+      new Category('Revisor', 3640),
+      new Category('Advokat', 3645),
+      new Category('Forsikringer', 3650),
+    ]),
   ]
 
-  let settings = writable({
+  let settings: Writable<Settings> = writable({
     defaultCurrency: currencies[0],
     graphCurrency: currencies[0],
+
+    // Based on khaos systems chart of accounts
+    categories: categoryPresets[0].categories,
 
     // Settings for importing general ledger from your accounting software using an excel file.
     generalLedgerImportCurrency: currencies[0],
     generalLedgerImportOffset: 0,
     generalLedgerImportDateRowIndex: 0,
     generalLedgerImportPriceRowIndex: 0,
+    generalLedgerImportAccountRowIndex: 0,
   })
 
   let data: ChartData<'bar', (number | [number, number])[], unknown> = writable({ datasets: [] })
@@ -66,21 +99,6 @@
     const wb = utils.book_new()
     utils.book_append_sheet(wb, ws, 'Data')
     writeFileXLSX(wb, 'Export.xlsx')
-  }
-
-  function importFile(filePath) {
-    // Read the Excel file
-    const workbook = xlsx.readFile(filePath)
-    const sheetName = workbook.SheetNames[0]
-    const sheet = workbook.Sheets[sheetName]
-
-    // Convert sheet data to JSON
-    const jsonData = xlsx.utils.sheet_to_json(sheet)
-
-    // Unflatten the JSON data if necessary
-    const unflattenedData = jsonData.map(entry => unflatten(entry))
-
-    return unflattenedData
   }
 
   function importEntriesFile(event: EventTarget) {
@@ -109,7 +127,8 @@
 
   let importSettingsOpen: boolean = false
   let importedResult: SolverResult
-  let importedWorksheet = null
+  let importedCategories: Category[] = []
+  let importedWorksheet: WorkSheet | null = null
   /* handle file upload and read XLSX */
   function handleFileUpload(event: EventTarget) {
     importSettingsOpen = true
@@ -121,35 +140,46 @@
       const wb = read(arrayBuffer)
       importedWorksheet = wb.Sheets[wb.SheetNames[0]]
 
-      processImportedEntriesSheet()
+      resizeImportedSheet()
     }
     reader.readAsArrayBuffer(file)
   }
 
+  function resizeImportedSheet() {
+    rows = utils.sheet_to_json(importedWorksheet).slice($settings.generalLedgerImportOffset)
+  }
+
   function processImportedEntriesSheet() {
     if (importedWorksheet) {
-      rows = utils.sheet_to_json(importedWorksheet).slice($settings.generalLedgerImportOffset)
 
-      importedResult = { timestamps: [], categories: new Set<string>() }
+      importedResult = { timestamps: [], categories: new Set<Category>() }
       rows.slice(1).forEach(row => {
         try {
           const date = row[Object.keys(row)[$settings.generalLedgerImportDateRowIndex]]
           const price = row[Object.keys(row)[$settings.generalLedgerImportPriceRowIndex]]
+          const account = row[Object.keys(row)[$settings.generalLedgerImportAccountRowIndex]]
           const jsDate = excelDateToJSDate(date)
+
+          let category = importedCategories.find(c => c.account == account)
+          // if we fail to find a category that matches in the user settings and 'importedCategories', we create one
+          // and store it in the 'importedCategories' array. this will be destroyed on reload (not stored in local storage)
+          if (!category) {
+            category = new Category(`${account}`, account, true)
+            importedCategories.push(category)
+          }
+          
+          importedResult.categories.add(category)
 
           importedResult.timestamps.push({
             // Convert the zero-based month index from the JavaScript Date object to a one-based index suitable for the CalendarDate constructor.
             timestamp: new CalendarDate(jsDate.getFullYear(), jsDate.getMonth() + 1, jsDate.getDate()),
             amount: price / $settings.generalLedgerImportCurrency.rate, // In EUR
-            category: '_imported_',
+            category: category,
           })
         } catch (error) {
           console.log(`Failed to process row. '${error}'`)
         }
       })
-
-      console.log(rows)
-      console.log(importedResult)
 
       rebuild()
     }
@@ -162,25 +192,25 @@
   }*/
   // Helper function to convert Excel date to JavaScript date
   function excelDateToJSDate(serial) {
-   var utc_days  = Math.floor(serial - 25569);
-   var utc_value = utc_days * 86400;                                        
-   var date_info = new Date(utc_value * 1000);
+    var utc_days = Math.floor(serial - 25569)
+    var utc_value = utc_days * 86400
+    var date_info = new Date(utc_value * 1000)
 
-   var fractional_day = serial - Math.floor(serial) + 0.0000001;
+    var fractional_day = serial - Math.floor(serial) + 0.0000001
 
-   var total_seconds = Math.floor(86400 * fractional_day);
+    var total_seconds = Math.floor(86400 * fractional_day)
 
-   var seconds = total_seconds % 60;
+    var seconds = total_seconds % 60
 
-   total_seconds -= seconds;
+    total_seconds -= seconds
 
-   var hours = Math.floor(total_seconds / (60 * 60));
-   var minutes = Math.floor(total_seconds / 60) % 60;
+    var hours = Math.floor(total_seconds / (60 * 60))
+    var minutes = Math.floor(total_seconds / 60) % 60
 
-   return new Date(date_info.getFullYear(), date_info.getMonth(), date_info.getDate(), hours, minutes, seconds);
-}
+    return new Date(date_info.getFullYear(), date_info.getMonth(), date_info.getDate(), hours, minutes, seconds)
+  }
 
-  const MakeRow = (type: EntryType = EntryType.Expense, description: string = 'description', amount: number = 0, category: string = 'miscellaneous', interval: EntryInterval = EntryInterval.Monthly) => {
+  const MakeRow = (type: EntryType = EntryType.Expense, description: string = 'description', amount: number = 0, category: Category = $settings.categories[0], interval: EntryInterval = EntryInterval.Monthly) => {
     return {
       type: type,
       description: description,
@@ -207,84 +237,69 @@
     })
 
     // entries
-    entries.subscribe(e => { localStorage.entries = JSON.stringify(e) })
-    entries.subscribe(e => { rebuild() })
+    entries.subscribe(e => {
+      localStorage.entries = JSON.stringify(e)
+    })
+    entries.subscribe(e => {
+      rebuild()
+    })
     entries.set(newEntries)
 
     // settings local storage
     const storedSettings = localStorage.settings ? JSON.parse(localStorage.settings) : $settings
-    settings.subscribe(s => { localStorage.settings = JSON.stringify(s) })
-    settings.subscribe(s => processImportedEntriesSheet())
+    settings.subscribe(s => {
+      localStorage.settings = JSON.stringify(s)
+    })
+    settings.subscribe(s => importSettingsOpen && resizeImportedSheet())
     settings.subscribe(s => rebuild())
     settings.set(storedSettings)
   })
 
-  let categoryToggles = []
   function rebuild() {
+    const allCategories = [...$settings.categories, ...importedCategories]
+
     let result = solver.solve(get(entries), {
-      excludedCategories: categoryToggles.reduce((categories, toggle) => (toggle.enabled ? categories : [...categories, toggle.category]), []),
+      excludedCategories: allCategories.reduce((acc: Category[], cur) => cur.hidden ? [...acc, cur] : acc, [])
     })
 
-    // calculate statistics
-    statistics.set(solver.calculateStatistics(result))
-
-    // merge with results
+    // add imported (prefixed with imported)
     if (importedResult) {
       result.timestamps = [...result.timestamps, ...importedResult.timestamps]
-      result.categories.add('_imported_')
     }
+
+    // accumulate monthly
     let monthlyResults = solver.accumulateMonthly(result)
+    let newLabels = monthlyResults.map(item => item.date.toString())
 
-    data.labels = monthlyResults.map(item => item.label)
+    console.log(monthlyResults)
+    // calculate statistics
+    statistics.set(solver.calculateStatistics(result, { ignoreImported: true }))
 
-    // find all the categories
-    let categories: Set<string> = new Set()
-    monthlyResults.forEach(monthlyResult => {
-      monthlyResult.categorizedResults.forEach(categorizedResult => {
-        categories.add(categorizedResult.category)
-      })
-    })
-
-    // build category toggles
-    categories.forEach(category => {
-      let toggle = categoryToggles.find(e => e.category == category)
-      if (!toggle) {
-        categoryToggles.push({
-          category,
-          enabled: true,
-          color: colors[categoryToggles.length % colors.length],
-        })
-      }
-      categoryToggles = categoryToggles // force reactivity
-    })
-
-    let datasets = []
-    categories.forEach(categoryName => {
+    // create datasets for all the user categories
+    let newDatasets: ChartDataset<'bar', DefaultDataPoint<'bar'>>[] = []
+    allCategories.forEach(category => {
+      // make an array with the category balance foreach month
       let monthlyBalance: number[] = []
       monthlyResults.forEach(monthlyResult => {
-        // if the current month has any expenses in this category,
-        // add the balance to the monthlyBalance array, otherwise, just add a zero.
-        let categorizedResult = monthlyResult.categorizedResults.find(e => e.category == categoryName)
+        let categorizedResult = monthlyResult.categorizedResults.find(e => e.category.name == category.name && e.category.account == category.account)
         monthlyBalance.push(categorizedResult ? categorizedResult.balance : 0)
       })
 
       // add the dataset if toggle is enabled
-      if (categoryToggles.find(e => e.category == categoryName).enabled) {
-        datasets.push({
-          label: categoryName,
-          data: monthlyBalance,
-          backgroundColor: categoryName == '_imported_' ? 'rgba(255, 101, 101, 0.4)' : colors[datasets.length % colors.length].backgroundColor,
-          borderWidth: 2,
-          borderColor: categoryName == '_imported_' ? 'rgba(255, 101, 101, 1.0)' : colors[datasets.length % colors.length].borderColor,
-          stack: categoryName == '_imported_' ? 'Actual' : 'Expected',
-        })
-      }
+      category.name = category.name.replace('EXPECTED-', '')
+      newDatasets.push({
+        label: category.name,
+        data: monthlyBalance,
+        backgroundColor: category.color.backgroundColor,
+        borderWidth: 2,
+        borderColor: category.color.borderColor,
+        stack: category.imported ? "A" : "B",
+      })
     })
 
-    data.datasets = datasets
+    data.labels = newLabels
+    data.datasets = newDatasets
   }
-
-  $: categoryToggles, rebuild()
 </script>
 
 <!-- import from accounting software settings -->
@@ -296,13 +311,15 @@
     <div class="grid w-full items-center gap-1.5">
       <!-- currency -->
       <Label>Currency</Label>
-      <Select.Root selected={{ value: $settings.generalLedgerImportCurrency, label: $settings.generalLedgerImportCurrency.code }}
-      onSelectedChange={v => {
-        settings.update(s => {
-          s.generalLedgerImportCurrency = v.value
-          return s
-        })
-      }}>
+      <Select.Root
+        selected={{ value: $settings.generalLedgerImportCurrency, label: $settings.generalLedgerImportCurrency.code }}
+        onSelectedChange={v => {
+          settings.update(s => {
+            s.generalLedgerImportCurrency = v.value
+            return s
+          })
+        }}
+      >
         <Select.Trigger id="default-currency">
           <Select.Value placeholder="DKK" class="capitalize" />
         </Select.Trigger>
@@ -316,17 +333,21 @@
         <Select.Input name="favoriteFruit" />
       </Select.Root>
 
-      <!-- range -->
+      <!-- Import -->
       <Label>Import Offset</Label>
       <Input type="number" bind:value={$settings.generalLedgerImportOffset} />
 
-      <!-- range -->
+      <!-- Date -->
       <Label>Date Row Index</Label>
       <Input type="number" bind:value={$settings.generalLedgerImportDateRowIndex} />
 
-      <!-- range -->
+      <!-- Price -->
       <Label>Price Row Index</Label>
       <Input type="number" bind:value={$settings.generalLedgerImportPriceRowIndex} />
+
+      <!-- accout -->
+      <Label>Account Row Index</Label>
+      <Input type="number" bind:value={$settings.generalLedgerImportAccountRowIndex} />
 
       <!-- data -->
       {#if rows.length}
@@ -342,7 +363,7 @@
             {#each rows.slice(1, 10) as row}
               <Table.Row>
                 {#each Object.keys(row) as key, index}
-                  <Table.Cell class={`${index == $settings.generalLedgerImportDateRowIndex ? 'text-blue-500' : index == $settings.generalLedgerImportPriceRowIndex ? 'text-green-500' : ''}`}>{row[key]}</Table.Cell>
+                  <Table.Cell class={`${index == $settings.generalLedgerImportDateRowIndex ? 'text-blue-500' : index == $settings.generalLedgerImportPriceRowIndex ? 'text-green-500' : index == $settings.generalLedgerImportAccountRowIndex ? 'text-purple-500' : ''}`}>{row[key]}</Table.Cell>
                 {/each}
               </Table.Row>
             {/each}
@@ -352,7 +373,7 @@
     </div>
 
     <Dialog.Footer>
-      <Dialog.Close class={`${buttonVariants({ variant: 'default', size: 'default' })}`}>Close</Dialog.Close>
+      <Dialog.Close class={`${buttonVariants({ variant: 'default', size: 'default' })}`} on:click={processImportedEntriesSheet}>Import</Dialog.Close>
     </Dialog.Footer>
   </Dialog.Content>
 </Dialog.Root>
@@ -376,7 +397,7 @@
           plugins: {
             tooltip: {
               callbacks: {
-                label: item => `${item.dataset.label}: ${parseFloat(item.formattedValue.replace(".", "")).toFixed(2) * $settings.graphCurrency.rate} ${$settings.graphCurrency.code}`,
+                label: item => `${item.dataset.label}: ${parseFloat(item.formattedValue.replace('.', '')).toFixed(2) * $settings.graphCurrency.rate} ${$settings.graphCurrency.code}`,
               },
             },
           },
@@ -400,6 +421,8 @@
 
         <div>
           <div class="opacity-50">Statistics / Duration</div>
+          <div class="opacity-75 font-semibold">Start Date: {$statistics.startDate?.toString()}</div>
+          <div class="opacity-75 font-semibold">End Date: {$statistics.endDate?.toString()}</div>
           <div class="opacity-75 font-semibold">Days: {$statistics.days}</div>
           <div class="opacity-75 font-semibold">Months: {$statistics.months}</div>
           <div class="opacity-75 font-semibold">Years: {$statistics.years}</div>
@@ -513,6 +536,77 @@
                 </Select.Content>
                 <Select.Input name="favoriteFruit" />
               </Select.Root>
+
+              <!-- chart of account presets-->
+              <Label for="graph-currency">CoA Presets</Label>
+              <Select.Root
+                onSelectedChange={v => {
+                  settings.update(s => {
+                    s.categories = v?.value.categories
+                    return s
+                  })
+                }}
+              >
+                <Select.Trigger>
+                  <Select.Value placeholder="Select a preset" />
+                </Select.Trigger>
+                <Select.Content>
+                  <Select.Group>
+                    {#each categoryPresets as categoryPreset}
+                      <Select.Item value={categoryPreset} class="uppercase">{categoryPreset.name}</Select.Item>
+                    {/each}
+                  </Select.Group>
+                </Select.Content>
+                <Select.Input name="favoriteFruit" />
+              </Select.Root>
+
+              <!-- accounts -->
+              <div class="max-h-96 overflow-scroll">
+                <Table.Root>
+                  <Table.Caption>
+                    <Button
+                      on:click={() =>
+                        settings.update(s => {
+                          s.categories.push(new Category('New Category'))
+                          return s
+                        })}
+                      class="p-2"
+                      variant="outline"><Plus size="20" /></Button
+                    >
+                  </Table.Caption>
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.Head class="w-0"></Table.Head>
+                      <Table.Head class="w-28">Account</Table.Head>
+                      <Table.Head class="w-40">Name</Table.Head>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    {#each $settings.categories as category, index}
+                      <Table.Row>
+                        <Table.Cell>
+                          <Button
+                            variant="ghost"
+                            class="p-2 hover:bg-red-500"
+                            on:click={() => {
+                              $settings.update(s => {
+                                s.categories.splice(index, 1)
+                                return s
+                              })
+                            }}><X size="20" /></Button
+                          >
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Input type="text" placeholder="Description..." bind:value={category.account} />
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Input type="text" placeholder="Description..." bind:value={category.name} />
+                        </Table.Cell>
+                      </Table.Row>
+                    {/each}
+                  </Table.Body>
+                </Table.Root>
+              </div>
             </div>
 
             <Dialog.Footer>
@@ -523,14 +617,14 @@
       </div>
       <div class="flex flex-grow"></div>
       <div class="flex flex-row flex-wrap gap-2 justify-right my-auto">
-        {#each categoryToggles as categoryToggle}
+        {#each $settings.categories as category}
           <Button
-            style={`opacity: ${categoryToggle.enabled ? '1.0' : '0.3'};background-color: ${categoryToggle.color.backgroundColor}; color: ${categoryToggle.color.borderColor}; border-color: ${categoryToggle.color.borderColor}`}
+            style={`opacity: ${category.hidden ? '0.3' : '1.0'};background-color: ${category.color.backgroundColor}; color: ${category.color.borderColor}; border-color: ${category.color.borderColor}`}
             class="border-2 font-semibold  h-fit p-1.5 py-1"
             on:click={() => {
-              categoryToggle.enabled = !categoryToggle.enabled
+              category.hidden = !category.hidden
             }}
-            value={categoryToggle.category}>{categoryToggle.category}</Button
+            value={category.name}>{category.name}</Button
           >
         {/each}
       </div>
@@ -584,9 +678,10 @@
             </Table.Cell>
             <Table.Cell>
               <Select.Root
-                selected={{ value: entry.category, label: entry.category }}
+                selected={{ value: entry.category, label: entry.category.name }}
                 onSelectedChange={v => {
                   entry.category = v.value
+                  return v
                 }}
               >
                 <Select.Trigger>
@@ -594,19 +689,9 @@
                 </Select.Trigger>
                 <Select.Content>
                   <Select.Group>
-                    <Select.Item value="miscellaneous" class="capitalize">miscellaneous</Select.Item>
-                    <Select.Item value="payroll" class="capitalize">payroll</Select.Item>
-                    <Select.Item value="utilities" class="capitalize">utilities</Select.Item>
-                    <Select.Item value="insurance" class="capitalize">insurance</Select.Item>
-                    <Select.Item value="taining" class="capitalize">taining</Select.Item>
-                    <Select.Item value="travel" class="capitalize">travel</Select.Item>
-                    <Select.Item value="website" class="capitalize">website</Select.Item>
-                    <Select.Item value="software" class="capitalize">software</Select.Item>
-                    <Select.Item value="hardware" class="capitalize">hardware</Select.Item>
-                    <Select.Item value="office" class="capitalize">office</Select.Item>
-                    <Select.Item value="server" class="capitalize">server</Select.Item>
-                    <Select.Item value="rent" class="capitalize">rent</Select.Item>
-                    <Select.Item value="catering" class="capitalize">catering</Select.Item>
+                    {#each $settings.categories as category}
+                      <Select.Item value={category} class="capitalize">{category.name}</Select.Item>
+                    {/each}
                   </Select.Group>
                 </Select.Content>
                 <Select.Input name="favoriteFruit" />
@@ -684,7 +769,7 @@
     <Alert.Root class="text-orange-400">
       <Alert.Description>
         <TriangleAlert class="h-4 w-4 inline mr-1" />
-        Missing features: import account when looking at general ledger, timeline, graph currency, cash flow, dark/light mode, day/month intervals on bar chart
+        Missing features: import accounts when looking at general ledger (konto plan i settings? categories with name and account id(optional)), timeline, graph currency, cash flow, dark/light mode, day/month intervals on bar chart
       </Alert.Description>
     </Alert.Root>
   </div>

@@ -1,4 +1,6 @@
-import { type today, type getLocalTimeZone, type startOfYear, type endOfYear, CalendarDate } from '@internationalized/date'
+import { type today, type getLocalTimeZone, type startOfYear, type endOfYear, CalendarDate, startOfMonth } from '@internationalized/date'
+import { Calendar, type Month } from 'bits-ui'
+import type { Bold } from 'lucide-svelte'
 
 export enum EntryType {
   Expense = 'expense',
@@ -35,28 +37,61 @@ export interface Entry {
   amount: number
   currency: Currency
   interval: EntryInterval
-  category: string
+  category: Category
   timeRange: EntryTimeRange
 }
 
+export interface CategoryColor {
+  backgroundColor: string
+  borderColor: string
+}
+
+export const colors: CategoryColor[] = [
+  { backgroundColor: 'rgba(255, 177, 101, 0.4)', borderColor: 'rgba(255, 177, 101, 1)' },
+  { backgroundColor: 'rgba(101, 255, 137, 0.4)', borderColor: 'rgba(101, 255, 137, 1)' },
+  { backgroundColor: 'rgba(101, 157, 255, 0.4)', borderColor: 'rgba(101, 157, 255, 1)' },
+  { backgroundColor: 'rgba(255, 101, 101, 0.4)', borderColor: 'rgba(255, 101, 101, 1)' },
+  { backgroundColor: 'rgba(255, 251, 101, 0.4)', borderColor: 'rgba(255, 251, 101, 1)' },
+  { backgroundColor: 'rgba(137, 101, 255, 0.4)', borderColor: 'rgba(137, 101, 255, 1)' },
+  { backgroundColor: 'rgba(101, 255, 241, 0.4)', borderColor: 'rgba(101, 255, 241, 1)' },
+  { backgroundColor: 'rgba(177, 101, 255, 0.4)', borderColor: 'rgba(177, 101, 255, 1)' },
+  { backgroundColor: 'rgba(255, 101, 221, 0.4)', borderColor: 'rgba(255, 101, 221, 1)' },
+  { backgroundColor: 'rgba(101, 255, 101, 0.4)', borderColor: 'rgba(101, 255, 101, 1)' },
+]
+
+export class Category {
+  // General Ledger Accounts (GLs) account number
+  account: number
+  name: string
+  hidden: boolean = false
+  imported: boolean = true
+  color: CategoryColor = colors[Math.floor(Math.random() * colors.length)]
+
+  constructor(name: string, account: number = -1, imported: boolean = false) {
+    this.account = account
+    this.name = name
+    this.imported = imported
+  }
+}
+
 export interface SolverOptions {
-  excludedCategories: string[]
+  excludedCategories: Category[]
 }
 
 export interface TimestampEntry {
   timestamp: CalendarDate
   // In EUR
   amount: number
-  category: string
+  category: Category
 }
 
 export interface Result {
   timestamps: TimestampEntry[]
-  categories: Set<string>
+  categories: Set<Category>
 }
 
 export function solve(entries: Entry[], options: SolverOptions = { excludedCategories: [] }): Result {
-  let result: Result = { timestamps: [], categories: new Set<string>() }
+  let result: Result = { timestamps: [], categories: new Set<Category>() }
 
   entries.forEach(entry => {
     try {
@@ -64,7 +99,7 @@ export function solve(entries: Entry[], options: SolverOptions = { excludedCateg
         return
       }
 
-      if (options.excludedCategories.includes(entry.category)) {
+      if (options.excludedCategories.find(c => c.name == entry.category.name)) {
         return
       }
 
@@ -105,7 +140,7 @@ export function solve(entries: Entry[], options: SolverOptions = { excludedCateg
         }
       }
     } catch (error) {
-      console.log(`Failed to process entry. '${error}'`)
+      console.warn(`Failed to process entry. '${error}'`)
     }
   })
 
@@ -113,81 +148,81 @@ export function solve(entries: Entry[], options: SolverOptions = { excludedCateg
 }
 
 export type CategorizedResult = {
-  category: string
+  category: Category
   balance: number
 }
 
 export type MonthlyResult = {
   date: CalendarDate
-  label: string
   categorizedResults: CategorizedResult[]
 }
 
 export function accumulateMonthly(result: Result): MonthlyResult[] {
-  // Helper function to generate a label for a given date
-  const generateLabel = (year: number, month: number): string => {
-    return `${new Date(year, month - 1, 1).toLocaleString('default', { month: 'short' })} ${year}`
+  // init results array
+  let monthlyResults: MonthlyResult[] = []
+
+  // Get more info about the results.
+  const statistics = calculateStatistics(result);
+  if (!statistics.startDate || !statistics.endDate) {
+    console.error(`Failed accumulating result. 'startDate' or 'endDate' date was invalid. startDate: '${statistics.startDate}', endDate: '${statistics.endDate}'`);
+    return monthlyResults
   }
 
-  const monthlyResults: MonthlyResult[] = []
-  console.log(result.timestamps)
-  result.timestamps.forEach((entry, index) => {
-    try {
-      // Validate the timestamp properties
-      if (entry.timestamp && typeof entry.timestamp.year === 'number' && typeof entry.timestamp.month === 'number') {
-        const date = new CalendarDate(entry.timestamp.year, entry.timestamp.month, 1);
-        const label = generateLabel(entry.timestamp.year, entry.timestamp.month);
-  
-        let monthlyResult = monthlyResults.find(e => e.date.compare(date) == 0);
-        if (!monthlyResult) {
-          monthlyResult = { date: date, label: label, categorizedResults: [] };
-          monthlyResults.push(monthlyResult);
-        }
-  
-        let categorizedResult = monthlyResult.categorizedResults.find(e => e.category === entry.category);
-        if (!categorizedResult) {
-          categorizedResult = { category: entry.category, balance: entry.amount };
-          monthlyResult.categorizedResults.push(categorizedResult);
-        } else {
-          categorizedResult.balance += entry.amount;
-        }
-      } else {
-        throw new Error("Invalid timestamp in entry");
-      }
-    } catch (error) {
-      console.log(`Failed accumulating result for entry ${index}. Error: '${error.message}'`);
-    }
-  });
-  
-  // Log the final results to debug
-  console.log('Final monthly results:', JSON.stringify(monthlyResults, null, 2));
+  // make sure that endDate is after startDate
+  if (statistics.startDate.compare(statistics.endDate) >= 0) {
+    console.error(`'startDate' was after 'endDate' aborting... startDate: '${statistics.startDate}', endDate: '${statistics.endDate}'`);
+    return monthlyResults
+  }
 
-  // Sort months
+  // Accumulate sums for each months, from statistics.startDate to statistics.endDate
+  let currentDate = startOfMonth(statistics.startDate)
+  while (currentDate.compare(statistics.endDate) <= 0) {
+    try {
+      // add current month to results
+      monthlyResults.push({
+        date: currentDate,
+        categorizedResults: []
+      })
+
+      // get ref to this month for easy access.
+      let thisMonthsResults = monthlyResults[monthlyResults.length - 1]
+
+      // add timestamps
+      result.timestamps.forEach((entry) => {
+        try {
+          // return early if this timestamp is not in the current month
+          if (entry.timestamp.compare(currentDate) < 0 || entry.timestamp.compare(currentDate.add({ months: 1 })) >= 0) {
+            return;
+          }
+
+          // find the correct category, add to sum, create if not exists
+          let categorizedResult = thisMonthsResults.categorizedResults.find(e => e.category === entry.category);
+          if (!categorizedResult) {
+            categorizedResult = { category: entry.category, balance: entry.amount };
+            thisMonthsResults.categorizedResults.push(categorizedResult);
+          } else {
+            categorizedResult.balance += entry.amount;
+          }
+        } catch (error) {
+          throw new Error(`Something went wrong accumulating entry. '${error}'`);
+        }
+      })
+    } catch (error) {
+      console.error(`Something went wrong. '${error}'`);
+    }
+
+    console.warn(monthlyResults)
+
+    // Move to the next month
+    currentDate = currentDate.add({ months: 1 });
+  }
+
+
+  // Sort months, not sure if this is required..
   monthlyResults.sort((a, b) => a.date.compare(b.date))
 
-  // Insert empty results for missing months
-  const filledMonthlyResults: MonthlyResult[] = []
-
-  if (monthlyResults.length > 0) {
-    let currentDate = monthlyResults[0].date
-    let endDate = monthlyResults[monthlyResults.length - 1].date
-
-    while (currentDate.compare(endDate) <= 0) {
-      let currentMonthResult = monthlyResults.find(e => e.date.toString() == currentDate.toString())
-      if (currentMonthResult) {
-        filledMonthlyResults.push(currentMonthResult)
-      } else {
-        filledMonthlyResults.push({
-          date: new CalendarDate(currentDate.year, currentDate.month, 0),
-          label: generateLabel(currentDate.year, currentDate.month),
-          categorizedResults: [],
-        })
-      }
-      currentDate = currentDate.add({ months: 1 })
-    }
-  }
-
-  return filledMonthlyResults
+  // return successfully
+  return monthlyResults
 }
 
 export type Statistics = {
@@ -199,6 +234,8 @@ export type Statistics = {
   monthlyAverage: number
   quarterlyAverage: number
   // duration
+  startDate?: CalendarDate | null
+  endDate?: CalendarDate | null
   days: number
   months: number
   years: number
@@ -217,16 +254,26 @@ function getYearsDifference(startDate: Date, endDate: Date): number {
   return endDate.getFullYear() - startDate.getFullYear()
 }
 
-export function calculateStatistics(result: Result): Statistics {
-  const total = result.timestamps.reduce((a, e) => a + e.amount, 0)
+export interface CalculateStatisticsOptions {
+  ignoreImported: boolean
+} 
 
-  if (result.timestamps.length === 0) {
+export function calculateStatistics(result: Result, options: CalculateStatisticsOptions = { ignoreImported: false }): Statistics {
+  // filter results according to options
+  const filteredTimestamps = options.ignoreImported ? result.timestamps.filter(val => !val.category.imported) : result.timestamps;
+
+  // calculate total
+  const total = filteredTimestamps.reduce((a, e) => a + e.amount, 0)
+
+  if (filteredTimestamps.length === 0) {
     return {
       total,
       dailyAverage: 0,
       weeklyAverage: 0,
       monthlyAverage: 0,
       quarterlyAverage: 0,
+      startDate: null,
+      endDate: null,
       days: 0,
       months: 0,
       years: 0,
@@ -234,7 +281,7 @@ export function calculateStatistics(result: Result): Statistics {
   }
 
   // Sort timestamps to find the earliest and latest dates
-  const sortedTimestamps = result.timestamps.slice().sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+  const sortedTimestamps = filteredTimestamps.slice().sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
   const startDate = new Date(sortedTimestamps[0].timestamp)
   const endDate = new Date(sortedTimestamps[sortedTimestamps.length - 1].timestamp)
 
@@ -253,6 +300,9 @@ export function calculateStatistics(result: Result): Statistics {
     weeklyAverage,
     monthlyAverage,
     quarterlyAverage,
+    // Convert the zero-based month index from the JavaScript Date object to a one-based index suitable for the CalendarDate constructor.
+    startDate: new CalendarDate(startDate.getFullYear(), startDate.getMonth() + 1, startDate.getDate()),
+    endDate: new CalendarDate(endDate.getFullYear(), endDate.getMonth() + 1, endDate.getDate()),
     days,
     months,
     years,
@@ -263,4 +313,5 @@ export default {
   solve,
   accumulateMonthly,
   calculateStatistics,
+  colors
 }
